@@ -1,0 +1,17 @@
+# Validation de la première application
+
+Vérifications exécutées dans cet environnement le 10 octobre 2026 :
+
+- Installation reproductible avec `npm ci`, vérification TypeScript et compilation de production Next.js réussies.
+- 6 tests de domaine réussis : fourchettes de budget, prix inconnus, validation des réservations, publication, adresses interdites pour l’import de liens.
+- 17 scénarios PostgreSQL réussis sur des bases jetables. Ils testent notamment les rôles, l’isolation des idées privées et de leur historique, l’absence de données privées dans la vue invitée, les réservations concurrentes, le plafond des participations, les restaurations, les droits de modification et la duplication des idées globales sans ancienne réservation. Un changement vers « Moi uniquement » ne dévoile aucun nouveau titre dans le lien de réservation ou les emails suivants.
+- 13 parcours Chromium réussis sur l’application compilée : connexion réelle, création des destinataires/listes, brouillon, conservation d’un lien partagé pendant la connexion, publication, confidentialité, réservation invitée, révélation volontaire des noms, modification depuis une liste, archivage/annulation et annulation par l’invité. Affichage à 390 et 1440 pixels, bouton d’ajout fixe et absence de débordement horizontal vérifiés.
+- Démarrage et reprise des services locaux d’authentification (GoTrue), de données (PostgREST) et de l’application vérifiés par des requêtes fonctionnelles. Les clés locales sont uniquement destinées aux tests et ne doivent pas servir au déploiement.
+
+Les tests SQL utilisent des fixtures pour les schémas `auth` et `storage`. Les tests navigateur utilisent GoTrue et PostgREST réels. Aucun de ces tests ne valide le stockage Supabase réel, la caméra d’un téléphone physique, la livraison Resend ou les réponses de l’API Unsplash : les comptes et clés correspondants ne sont pas encore fournis.
+
+Le démarrage standard de Supabase local a échoué sur la taille de l’image PostgreSQL dans cet environnement ; les vérifications ont utilisé une image PostgreSQL 17 plus légère. Le premier téléchargement de Chromium Playwright était interdit par le réseau ; le navigateur Chromium déjà installé a permis les tests. L’essai d’import externe de `https://example.com` a échoué à la résolution DNS dans cet environnement. La protection des adresses est testée, mais l’extraction d’un vrai produit reste à vérifier sur l’hébergement final. Le formulaire permet de compléter les champs à la main en cas d’échec.
+
+Les emails sont enregistrés dans une file transactionnelle ; sans Resend ils restent en attente. Leur livraison réelle, leur domaine d’envoi et les relances planifiées doivent être testés avant ouverture aux invités. Les préférences proposent les emails à chaque réservation ou leur désactivation ; aucun résumé quotidien ni notification push n’est livré.
+
+L’application n’est pas publiée. La configuration réutilisable de l’environnement cloud (installation, reprise des services et variables nécessaires) est enregistrée dans un brouillon de paramètres ; sa publication et la restauration dans une nouvelle tâche ne sont pas vérifiées.
