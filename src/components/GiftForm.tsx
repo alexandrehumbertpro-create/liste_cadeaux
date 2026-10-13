@@ -19,7 +19,7 @@ const initial: GiftInput = {
   imageCredit: null,
   priceMin: null,
   priceMax: null,
-  visibility: "household",
+  visibility: "public",
   candidates: [],
   recipientId: null,
   listIds: [],
@@ -36,6 +36,8 @@ export default function GiftForm({
   draft,
   done,
   onDraft,
+  defaultRecipientId,
+  defaultListId,
 }: {
   data: Dataset;
   idea?: Idea;
@@ -44,6 +46,8 @@ export default function GiftForm({
   draft?: GiftInput;
   done: () => void;
   onDraft: () => void;
+  defaultRecipientId?: string;
+  defaultListId?: string;
 }) {
   const router = useRouter();
   const [v, set] = useState<GiftInput>(
@@ -63,19 +67,28 @@ export default function GiftForm({
             priceMin: idea.price_min,
             priceMax: idea.price_max,
             visibility: idea.visibility,
-            candidates: idea.candidates,
+            candidates: proposal?.recipient_id
+              ? [proposal.recipient_id]
+              : idea.candidates,
             recipientId: proposal?.recipient_id ?? null,
             listIds: proposal?.list_ids ?? [],
-            global: proposal?.is_global ?? false,
+            global: false,
             priority: proposal?.priority ?? 2,
             collective: proposal?.collective ?? false,
             targetAmount: proposal?.target_amount ?? null,
           }
-        : { ...initial }),
+        : {
+            ...initial,
+            candidates: defaultRecipientId ? [defaultRecipientId] : [],
+            recipientId: defaultRecipientId ?? null,
+            listIds: defaultListId ? [defaultListId] : [],
+          }),
   );
   const [image, setImage] = useState(preview ?? draft?.imageUrl ?? ""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [metadataStatus, setMetadataStatus] = useState(""),
+    [imageFailed, setImageFailed] = useState(false),
     [q, setQ] = useState(""),
     [photos, setPhotos] = useState<
       {
@@ -117,9 +130,15 @@ export default function GiftForm({
     } else if (!r.ok) setError(r.error);
   }
   async function extract() {
-    if (!v.url) return;
+    if (!v.url) {
+      setError("Ajoutez un lien avant de récupérer ses détails.");
+      return;
+    }
     setBusy(true);
     setError("");
+    setMetadataStatus(
+      "Recherche du nom, de la photo, du prix et de la description…",
+    );
     try {
       const r = await fetch("/api/metadata", {
         method: "POST",
@@ -127,7 +146,7 @@ export default function GiftForm({
         body: JSON.stringify({ url: v.url }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
+      if (!r.ok) throw new Error(d.error || "La récupération a échoué.");
       set((old) => ({
         ...old,
         title: old.title || d.title || "",
@@ -135,8 +154,25 @@ export default function GiftForm({
         imageUrl: old.imageUrl || d.image || "",
         priceMin: old.priceMin ?? d.price ?? null,
       }));
-      if (!v.imageUrl) setImage(d.image ?? "");
+      if (!v.imageUrl) {
+        setImage(d.image ?? "");
+        setImageFailed(false);
+      }
+      const found = [
+        d.title && "nom",
+        d.image && "photo",
+        d.price != null && "prix",
+        d.description && "description",
+      ].filter(Boolean);
+      setMetadataStatus(
+        found.length
+          ? "Informations trouvées : " +
+              found.join(", ") +
+              ". Vérifiez les champs avant d’enregistrer."
+          : "Aucune information récupérable sur cette page. Complétez les champs à la main.",
+      );
     } catch (e) {
+      setMetadataStatus("");
       setError(
         (e as Error).message + " Vous pouvez compléter les champs à la main.",
       );
@@ -149,7 +185,13 @@ export default function GiftForm({
         e.preventDefault();
         setBusy(true);
         setError("");
-        const r = await saveGift(v);
+        const r = await saveGift({
+          ...v,
+          recipientId: v.candidates.includes(v.recipientId ?? "")
+            ? v.recipientId
+            : (v.candidates[0] ?? null),
+          global: false,
+        });
         setBusy(false);
         if (!r.ok) {
           setError(r.error);
@@ -182,10 +224,40 @@ export default function GiftForm({
             disabled={busy || !v.url}
             onClick={extract}
           >
-            Récupérer
+            {busy ? "En cours…" : "Récupérer"}
           </button>
         </div>
       </label>
+      <div aria-live="polite" role="status">
+        {metadataStatus && <p className="notice">{metadataStatus}</p>}
+      </div>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="metadata-preview">
+        {image ? (
+          <figure>
+            <img
+              src={image}
+              alt="Aperçu de l’illustration du cadeau"
+              onError={() => setImageFailed(true)}
+              onLoad={() => setImageFailed(false)}
+            />
+            <figcaption>
+              {imageFailed
+                ? "Cette image ne peut pas être affichée. Vous pouvez importer une photo."
+                : "Aperçu de l’image · vous pouvez la remplacer ci-dessous"}
+            </figcaption>
+          </figure>
+        ) : (
+          <p className="hint">
+            Aucune image pour le moment. Récupérez un lien ou importez une
+            photo.
+          </p>
+        )}
+      </div>
       <label>
         Votre idée
         <input
@@ -197,7 +269,6 @@ export default function GiftForm({
         />
       </label>
       <div className="image-tools">
-        {image && <img src={image} alt="Illustration choisie" />}
         <label className="file-button">
           Importer une photo
           <input
@@ -269,7 +340,7 @@ export default function GiftForm({
         )}
       </details>
       <fieldset>
-        <legend>Pour qui ? Personnes possibles</legend>
+        <legend>Pour qui ?</legend>
         <div className="chips">
           {data.recipients.map((p) => (
             <button
@@ -296,7 +367,7 @@ export default function GiftForm({
                   candidates: ids,
                   recipientId: ids.includes(old.recipientId ?? "")
                     ? old.recipientId
-                    : null,
+                    : (ids[0] ?? null),
                 }));
               }}
             >
@@ -319,24 +390,6 @@ export default function GiftForm({
           </button>
         </div>
       </fieldset>
-      {v.candidates.length > 0 && (
-        <label>
-          Destinataire choisi pour cette proposition
-          <select
-            value={v.recipientId ?? ""}
-            onChange={(e) => change("recipientId", e.target.value || null)}
-          >
-            <option value="">À décider plus tard</option>
-            {data.recipients
-              .filter((r) => v.candidates.includes(r.id))
-              .map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-          </select>
-        </label>
-      )}
       <fieldset>
         <legend>Dans quelles listes ?</legend>
         <div className="chips">
@@ -376,17 +429,9 @@ export default function GiftForm({
             + Liste
           </button>
         </div>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={v.global}
-            onChange={(e) => change("global", e.target.checked)}
-          />{" "}
-          ✨ Toutes les listes
-        </label>
         <small>
-          L’idée apparaît dans les listes actuelles et futures, selon sa
-          visibilité.
+          Facultatif : vous pourrez ajouter cette idée à des listes depuis Mes
+          idées.
         </small>
       </fieldset>
       <label>
@@ -419,7 +464,7 @@ export default function GiftForm({
             ? "aucune liste invitée, visible par vous uniquement"
             : "aucune liste invitée, visible par les gestionnaires"}
       </p>
-      <details open={Boolean(idea)}>
+      <details open={Boolean(idea) || Boolean(metadataStatus)}>
         <summary>Prix, priorité et précisions</summary>
         <div className="row">
           <label>

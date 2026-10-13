@@ -26,7 +26,7 @@ async function login(page, who) {
   await page.getByLabel("Email", { exact: true }).fill(accounts[who].email);
   await page.getByLabel("Mot de passe").fill(accounts[who].password);
   await page.getByRole("button", { name: "Ouvrir mon carnet" }).click();
-  await page.getByRole("heading", { name: "Mes idées", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Pour qui", exact: true }).waitFor();
 }
 const admin = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -37,7 +37,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 try {
   await check("Connexion réelle d’Alex sur mobile", () => login(page, "Alex"));
   await check("Création d’un destinataire et d’une liste", async () => {
-    await page.getByRole("button", { name: "☺ Pour qui ?" }).click();
+    await page.getByRole("button", { name: "☺ Pour qui" }).click();
     await page
       .getByRole("button", { name: "+ Destinataire", exact: true })
       .click();
@@ -81,9 +81,6 @@ try {
     async () => {
       const d = page.getByRole("dialog");
       await d.getByRole("button", { name: "Alex", exact: true }).click();
-      await d
-        .getByLabel("Destinataire choisi pour cette proposition")
-        .selectOption({ label: "Alex" });
       await d.getByRole("button", { name: listName, exact: true }).click();
       await d.getByLabel("Qui peut voir cette idée ?").selectOption("public");
       await d
@@ -99,6 +96,9 @@ try {
         .getByLabel("Note de gestion privée")
         .fill("NOTE_PRIVEE_INVISIBLE");
       await d.getByRole("button", { name: "Garder cette idée" }).click();
+      await page
+        .getByRole("button", { name: "✦ Mes idées", exact: true })
+        .click();
       await page
         .getByRole("heading", { name: ideaName, exact: true })
         .waitFor();
@@ -167,6 +167,7 @@ try {
   );
   await check("Identité masquée jusqu’au retournement explicite", async () => {
     await page.reload();
+    await page.getByRole("button", { name: "✦ Mes idées", exact: true }).click();
     await page.getByRole("heading", { name: /Déjà réservés/ }).waitFor();
     assert.equal(
       await page.getByText("Sophie et Marc", { exact: true }).count(),

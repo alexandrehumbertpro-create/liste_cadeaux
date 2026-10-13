@@ -157,6 +157,15 @@ for (const [name, email] of [
   );
   credentials[name] = { email, password, id: user.id };
 }
+await sql.query(
+  await readFile(
+    new URL(
+      "../supabase/migrations/202610130001_simplify_capture.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 await sql.end();
 await writeFile(
   "/tmp/kad-integration-credentials.json",

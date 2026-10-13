@@ -67,7 +67,9 @@ export async function saveGift(input: unknown): Promise<Result<string>> {
   try {
     const { db } = await requireAdmin(),
       data = giftInput.parse(input);
-    const { data: id, error } = await db.rpc("save_gift", { data });
+    const { data: id, error } = await db.rpc("save_gift_for_recipients", {
+      data,
+    });
     if (error) throw new Error(error.message);
     revalidatePath("/");
     await drainEmails();
@@ -258,14 +260,12 @@ export async function recordShare(
 ): Promise<Result> {
   try {
     const { db, user } = await requireAdmin();
-    const { error } = await db
-      .from("share_history")
-      .insert({
-        list_id: z.uuid().parse(listId),
-        created_by: user.id,
-        contact_name: z.string().trim().min(1).max(100).parse(name),
-        channel: z.enum(["whatsapp", "gmail", "sms"]).parse(channel),
-      });
+    const { error } = await db.from("share_history").insert({
+      list_id: z.uuid().parse(listId),
+      created_by: user.id,
+      contact_name: z.string().trim().min(1).max(100).parse(name),
+      channel: z.enum(["whatsapp", "gmail", "sms"]).parse(channel),
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   } catch (e) {

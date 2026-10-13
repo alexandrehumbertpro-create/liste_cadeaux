@@ -725,3 +725,127 @@ dialog > header h2 {
     display: none;
   }
 }
+
+/* Simplified gift capture and full-card navigation. */
+.grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.list-card,
+.gift-card {
+  position: relative;
+  min-width: 0;
+}
+.list-card .card-open::after,
+.gift-card .card-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.list-card .card-open:focus-visible::after,
+.gift-card .card-open:focus-visible::after {
+  outline: 3px solid var(--purple);
+  outline-offset: 3px;
+}
+.list-card .row,
+.gift-card .row,
+.gift-card .selection,
+.gift-card a,
+.gift-card .reservation-flip {
+  position: relative;
+  z-index: 2;
+}
+.gift-card .selection {
+  position: absolute;
+}
+.list-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 0;
+}
+.list-tag {
+  display: inline-block;
+  background: #eee3ff;
+  color: #593c85;
+  border: 1px solid #bba1dd;
+  border-radius: 14px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.guest-preview-link {
+  display: inline-block;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-decoration: none;
+}
+.metadata-preview figure {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f5eeff;
+  border-radius: 16px;
+}
+.metadata-preview img {
+  display: block;
+  width: 100%;
+  max-height: 210px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: white;
+}
+.metadata-preview figcaption {
+  font-size: 12px;
+  margin-top: 8px;
+}
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .gift-image {
+    height: 145px;
+  }
+  .gift-body {
+    padding: 12px;
+  }
+  .gift-body h2 {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+  .gift-body .row {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .gift-body button.secondary {
+    font-size: 12px;
+    padding: 8px;
+  }
+  .gift-image .badge {
+    max-width: calc(100% - 40px);
+    font-size: 10px;
+  }
+  .list-card h2 {
+    font-size: 17px;
+  }
+  .list-card .row {
+    flex-wrap: wrap;
+  }
+  .list-tags .list-tag {
+    font-size: 10px;
+  }
+  .gift-body .reservation-flip button {
+    width: 100%;
+    white-space: normal;
+  }
+  .list-banner .row {
+    flex-wrap: wrap;
+  }
+}
+/* A filter on the opening button would shrink its full-card hit area on hover. */
+.list-card .card-open:hover,
+.gift-card .card-open:hover {
+  filter: none;
+}

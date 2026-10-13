@@ -8,9 +8,17 @@ export async function POST(request: Request) {
       .object({ url: z.url().max(3000) })
       .parse(await request.json());
     return Response.json(await extractMetadata(url));
-  } catch {
+  } catch (error) {
     return Response.json(
-      { error: "Impossible de récupérer les détails de ce lien." },
+      {
+        error:
+          error instanceof Error &&
+          /^(Ce lien|Les détails|La page|Page trop|Trop de redirections)/.test(
+            error.message,
+          )
+            ? error.message
+            : "Impossible de récupérer les détails de ce lien. Le site peut bloquer la récupération automatique.",
+      },
       { status: 400 },
     );
   }

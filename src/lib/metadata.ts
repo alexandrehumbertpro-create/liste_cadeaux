@@ -25,7 +25,10 @@ export function publicAddress(ip: string) {
     );
   return false;
 }
-async function get(url: URL, redirects = 0): Promise<string> {
+async function get(
+  url: URL,
+  redirects = 0,
+): Promise<{ html: string; url: URL }> {
   if (
     !["https:", "http:"].includes(url.protocol) ||
     url.username ||
@@ -44,7 +47,9 @@ async function get(url: URL, redirects = 0): Promise<string> {
         family: address.family,
         headers: {
           "User-Agent": "KadHumbert/1.0 (gift-list metadata)",
-          Accept: "text/html",
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Encoding": "identity",
+          "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
         },
         lookup: ((
           _host: unknown,
@@ -90,7 +95,9 @@ async function get(url: URL, redirects = 0): Promise<string> {
           }
           chunks.push(chunk);
         });
-        res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        res.on("end", () =>
+          resolve({ html: Buffer.concat(chunks).toString("utf8"), url }),
+        );
         res.on("error", reject);
       },
     );
@@ -100,31 +107,101 @@ async function get(url: URL, redirects = 0): Promise<string> {
     request.on("error", reject);
   });
 }
-export async function extractMetadata(value: string) {
-  const url = new URL(value),
-    $ = load(await get(url));
+export function parseMetadata(html: string, baseUrl: string) {
+  const $ = load(html);
   const meta = (name: string) =>
     $(`meta[property="${name}"],meta[name="${name}"]`)
       .first()
       .attr("content")
       ?.trim() || "";
-  const rawImage = meta("og:image");
+  const objects: Record<string, any>[] = [];
+  function visit(value: unknown) {
+    if (Array.isArray(value)) value.forEach(visit);
+    else if (value && typeof value === "object") {
+      const object = value as Record<string, any>;
+      objects.push(object);
+      if (object["@graph"]) visit(object["@graph"]);
+      if (object.mainEntity) visit(object.mainEntity);
+      if (object.itemListElement) visit(object.itemListElement);
+      if (object.item) visit(object.item);
+    }
+  }
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      visit(JSON.parse($(el).text()));
+    } catch {}
+  });
+  const product = objects.find((o) =>
+    [o["@type"]]
+      .flat()
+      .some((t) => typeof t === "string" && /(?:^|[/#])Product$/.test(t)),
+  );
+  const offer = product
+    ? [product.offers].flat().find((o) => o && typeof o === "object")
+    : undefined;
+  const productImage = [product?.image].flat().find(Boolean);
+  const rawImage =
+    meta("og:image:secure_url") ||
+    meta("og:image") ||
+    meta("twitter:image") ||
+    (typeof productImage === "string"
+      ? productImage
+      : productImage?.url || productImage?.contentUrl) ||
+    $('link[rel="image_src"]').attr("href") ||
+    "";
   let image = "";
   try {
-    const resolved = new URL(rawImage, url);
-    if (rawImage && ["http:", "https:"].includes(resolved.protocol))
+    const resolved = new URL(rawImage, baseUrl);
+    if (
+      rawImage &&
+      ["http:", "https:"].includes(resolved.protocol) &&
+      !resolved.username &&
+      !resolved.password
+    )
       image = resolved.href;
   } catch {}
-  const valuePrice = Number(
-    meta("product:price:amount") || meta("og:price:amount"),
+  const rawPrice =
+    meta("product:price:amount") ||
+    meta("og:price:amount") ||
+    offer?.price ||
+    offer?.lowPrice ||
+    offer?.priceSpecification?.price ||
+    $('[itemprop="price"]').first().attr("content") ||
+    $('[itemprop="price"]').first().text();
+  const normalized = String(rawPrice ?? "").replace(/[\s\u00a0€$£]/g, "");
+  const numberPrice = Number(
+    normalized.includes(",") && normalized.includes(".")
+      ? normalized.lastIndexOf(",") > normalized.lastIndexOf(".")
+        ? normalized.replace(/\./g, "").replace(",", ".")
+        : normalized.replace(/,/g, "")
+      : normalized.replace(",", "."),
   );
   return {
-    title: (meta("og:title") || $("title").text()).slice(0, 200),
-    description: (meta("og:description") || meta("description")).slice(
-      0,
-      10000,
-    ),
+    title: (
+      meta("og:title") ||
+      product?.name ||
+      meta("twitter:title") ||
+      $("title").first().text()
+    )
+      .trim()
+      .slice(0, 200),
+    description: (
+      meta("og:description") ||
+      product?.description ||
+      meta("description") ||
+      meta("twitter:description") ||
+      ""
+    )
+      .trim()
+      .slice(0, 10000),
     image,
-    price: Number.isFinite(valuePrice) && valuePrice > 0 ? valuePrice : null,
+    price:
+      normalized && Number.isFinite(numberPrice) && numberPrice >= 0
+        ? numberPrice
+        : null,
   };
+}
+export async function extractMetadata(value: string) {
+  const result = await get(new URL(value));
+  return parseMetadata(result.html, result.url.href);
 }

@@ -1,4 +1,4 @@
-# Kad’Humbert — maquette version 5
+# Kad’Humbert — maquette version 7
 
 Slogan : Pour les âmes en panne d’inspiration.
 
@@ -6,11 +6,13 @@ Ouvrir index.html dans un navigateur. Le HTML est autonome pour les parcours de 
 
 ## Parcours et règles
 
-- Mes idées : carnet compact, ajout express, brouillon personnel, À classer, recherche et filtres propres à chaque vue, sélection groupée et tris.
-- Listes : création, favoris en tête, ordre personnel dans le mode Organiser. Chaque liste possède une page avec Ajouter une idée, Partager, recherche et filtres. Le menu Actions regroupe couverture/message, duplication et archivage.
-- Pour qui : candidats, destinataire choisi et Commun (distinct d’Alex et d’Elise). Une idée publique doit avoir un destinataire choisi. Pour proposer le même produit à une autre personne, créer une proposition via Réutiliser. Les propositions ont leurs réservations indépendantes.
+- Accueil et navigation sur mobile et ordinateur : Pour qui → Mes listes → Mes idées → À classer → Archives. Le logo revient vers Pour qui.
+- Mes idées : deux cartes par ligne sur mobile, trois sur ordinateur. Cartes entièrement cliquables, badges de listes renforcés, ajout express, brouillon personnel, recherche, filtres, sélection groupée et tris.
+- À classer : uniquement les idées sans destinataire ; une idée sans liste mais attribuée à une personne reste hors de cette rubrique.
+- Listes : bouton Afficher la liste en mode invité, retour à la vue gestionnaire, création, favoris en tête, ordre personnel dans le mode Organiser. Chaque liste possède une page avec Ajouter une idée, Partager, recherche et filtres. Le menu Actions regroupe couverture/message, duplication et archivage.
+- Pour qui : une seule sélection de personnes. Plusieurs personnes sélectionnées créent une idée indépendante pour chacune, avec des réservations indépendantes. Commun reste distinct et exclusif. Ajouter depuis une personne la présélectionne.
 - Confidentialité : Moi uniquement, Nous deux (gestionnaires), Public (invités des listes auxquelles l’idée appartient). Public ne signifie pas publication dans un annuaire. Seul le créateur peut rendre une idée privée. Les idées privées sont signalées par cadenas, contour et badge Confidentiel.
-- Formulaire progressif : titre/lien, personnes et listes, prix et priorité, visibilité et destinataire choisi, images et détails facultatifs. Le bouton d’enregistrement reste disponible dans le formulaire.
+- Formulaire progressif : titre/lien, personnes et listes facultatives, prix et priorité, visibilité Public par défaut, images et détails facultatifs. Aucun second champ de destinataire ni option Toutes les listes. Le bouton d’enregistrement reste disponible dans le formulaire.
 - Brouillons : enregistrés automatiquement sur cet appareil, séparés par gestionnaire. Une nouvelle saisie ou édition ne remplace pas un autre brouillon sans choix explicite. L’encart disparaît après sauvegarde.
 - Réservation immédiate avec nom familial et email obligatoire : aucune validation ni expiration. Budget collectif atteint = fermeture des contributions. Les réservés sont grisés et regroupés sous Déjà réservés, après les autres idées.
 - Le gestionnaire peut remettre un cadeau disponible depuis son détail, y compris dans les archives, avec confirmation. Restaurer une idée ne réactive pas sa réservation.
@@ -30,3 +32,5 @@ Le pack possède un manifeste avec Web Share Target, un service worker et des ic
 Les essais ont été effectués dans Chromium sur les parcours d’ajout/édition, brouillons, profils privés, attribution, réservation immédiate, reset administrateur, fermeture collective, filtres/compteurs, favoris, duplication, archives, actions groupées, historique et clavier. Les largeurs 320, 390, 768 et 1280 px ont été contrôlées pour le débordement horizontal. Cela ne constitue pas une certification d’accessibilité.
 
 Version 6 : bouton compact « + Idée » fixé à l’écran au-dessus de la navigation, accessible durant le défilement, réservé aux gestionnaires.
+
+Version 7 : récupération de lien illustrée par un exemple fictif (nom, photo, prix, description modifiables). Aucun site marchand réellement interrogé. Les anciennes idées globales sont converties en appartenances explicites aux listes existantes. L’application Next.js et les données Supabase ne sont pas modifiées.

@@ -43,7 +43,8 @@ Pour Supabase local standard : `SUPABASE_HOME=/tmp/kad-supabase npm run db:start
 ## Fonctions
 
 - Carnet partagé avec idées privées au créateur, visibilité « Nous deux » ou « Public ».
-- Destinataires possibles multiples et destinataire choisi par proposition, destinataire Commun distinct.
+- Accueil Pour qui, puis Mes listes, Mes idées, À classer et Archives. Une idée attribuée à plusieurs personnes crée un cadeau indépendant pour chacune ; Commun reste distinct.
+- Capture publique par défaut, listes facultatives, À classer pour les idées sans destinataire. Aperçu image après récupération d’un lien.
 - Listes illustrées, message d’accueil, lien invité unique, partage préparé WhatsApp/Gmail/SMS et carnet de destinataires du partage.
 - Capture express, brouillon personnel sur l’appareil, import de liens, photo importée ou caméra, illustrations Unsplash avec attribution.
 - Priorités, budget exact ou fourchette, filtres, filtres enregistrés, favoris et ordre personnel.
@@ -81,3 +82,9 @@ npm run test:db
 Pour les parcours navigateur, `scripts/local-test-stack.mjs` démarre GoTrue et PostgREST réels autour du PostgreSQL de test, crée des comptes locaux jetables et garde leurs identifiants dans un fichier privé de `/tmp`. Il refuse d’écraser un `.env.local` existant. Après un arrêt, `node scripts/resume-local.mjs` redémarre ses conteneurs, renouvelle les clés de développement et relance le routage local, sans toucher à un projet distant. Cette pile est destinée à un premier lancement dans un environnement isolé ; elle ne remplace pas Supabase pour les photos. Lancez ensuite l’application et `node scripts/browser-check.mjs` (Chromium système ou `CHROMIUM_PATH`). Ne réutilisez pas cette pile, ses clés ou ses comptes pour publier. Les ports de cette pile sont liés à l’interface locale, sans authentification réseau PostgreSQL ; elle reste exclusivement destinée aux tests isolés.
 
 Voir aussi le [cahier des charges](CAHIER_DES_CHARGES.md) et l’[audit UX](AUDIT_UX_UI.md).
+
+## Mise à jour du 13 octobre 2026
+
+Pour un projet existant, appliquer `supabase/migrations/202610130001_simplify_capture.sql` dans Supabase SQL Editor **avant** de déployer cette version. Ne pas rejouer la migration initiale. La migration conserve les idées, listes et réservations ; elle remplace les appartenances globales par des appartenances explicites aux listes existantes. Pour une nouvelle installation, appliquer les deux migrations dans l’ordre.
+
+Le bouton de récupération affiche les champs trouvés et l’aperçu image. L’extraction lit Open Graph, Twitter Cards et les produits JSON-LD. Un site qui bloque les accès automatiques ou charge ses informations uniquement en JavaScript peut nécessiter une saisie manuelle.

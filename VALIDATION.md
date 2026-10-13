@@ -15,3 +15,12 @@ Le démarrage standard de Supabase local a échoué sur la taille de l’image P
 Les emails sont enregistrés dans une file transactionnelle ; sans Resend ils restent en attente. Leur livraison réelle, leur domaine d’envoi et les relances planifiées doivent être testés avant ouverture aux invités. Les préférences proposent les emails à chaque réservation ou leur désactivation ; aucun résumé quotidien ni notification push n’est livré.
 
 L’application n’est pas publiée. La configuration réutilisable de l’environnement cloud (installation, reprise des services et variables nécessaires) est enregistrée dans un brouillon de paramètres ; sa publication et la restauration dans une nouvelle tâche ne sont pas vérifiées.
+
+## Mise à jour du 13 octobre 2026
+
+- TypeScript et compilation de production : vérifiés.
+- 9 tests unitaires, dont extraction JSON-LD, prix français et images relatives.
+- 19 scénarios PostgreSQL sur base jetable : confidentialité, réservations concurrentes, création atomique de cadeaux indépendants et capture publique sans destinataire exclue des liens invités.
+- 13 parcours navigateur de régression avec GoTrue/PostgREST réels en local.
+- 2 parcours supplémentaires à 390 et 1440 px : nouvel accueil, grilles, clic sur image, aperçu de récupération, absence des anciens champs, attribution multiple, À classer et raccourci invité. La réponse metadata est simulée pour les contrôles UI ; le parseur est testé séparément. L’extraction sur un site marchand réel n’a pas été vérifiée dans cette session.
+- Migration distante et déploiement : à faire après application du fichier `202610130001_simplify_capture.sql`. Aucun changement appliqué au projet Supabase distant ni à Vercel dans cette session.

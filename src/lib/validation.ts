@@ -37,11 +37,6 @@ export const giftInput = z
         code: "custom",
         message: "Le maximum doit être supérieur ou égal au minimum.",
       });
-    if (v.visibility === "public" && !v.recipientId)
-      c.addIssue({
-        code: "custom",
-        message: "Choisissez le destinataire de cette proposition publique.",
-      });
     if (v.recipientId && !v.candidates.includes(v.recipientId))
       c.addIssue({
         code: "custom",

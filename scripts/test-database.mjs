@@ -46,6 +46,15 @@ try {
       "utf8",
     ),
   );
+  await db.query(
+    await readFile(
+      new URL(
+        "../supabase/migrations/202610130001_simplify_capture.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   const alex = randomUUID(),
     elise = randomUUID(),
     outsider = randomUUID();
@@ -438,6 +447,114 @@ try {
         (await db.query("select archived_at from proposals where id=$1", [p]))
           .rows[0].archived_at,
         null,
+      );
+    },
+  );
+
+  await check(
+    "Capture publique sans destinataire reste absente du lien invité",
+    async () => {
+      await admin(alex, "update lists set archived_at=null where id=$1", [
+        list.id,
+      ]);
+      const input = {
+        title: "À classer",
+        description: "",
+        specifications: "",
+        privateNote: "",
+        url: "",
+        imageUrl: "",
+        imageCredit: null,
+        priceMin: null,
+        priceMax: null,
+        visibility: "public",
+        candidates: [],
+        recipientId: null,
+        listIds: [list.id],
+        global: false,
+        priority: 2,
+        collective: false,
+        targetAmount: null,
+      };
+      const pid = (
+        await admin(alex, "select save_gift_for_recipients($1::jsonb) id", [
+          input,
+        ])
+      ).rows[0].id;
+      const shared = (
+        await db.query("select shared_list($1) data", [list.share_token])
+      ).rows[0].data;
+      assert.equal(
+        shared.gifts.some((g) => g.id === pid),
+        false,
+      );
+    },
+  );
+  await check(
+    "Plusieurs personnes créent des idées indépendantes et restent atomiques",
+    async () => {
+      const second = (
+        await db.query("select id from recipients where name='Elise'")
+      ).rows[0].id;
+      const input = {
+        title: "Indépendante",
+        description: "",
+        specifications: "",
+        privateNote: "",
+        url: "",
+        imageUrl: "",
+        imageCredit: null,
+        priceMin: 50,
+        priceMax: null,
+        visibility: "public",
+        candidates: [recipient, second],
+        recipientId: recipient,
+        listIds: [list.id],
+        global: false,
+        priority: 2,
+        collective: false,
+        targetAmount: null,
+      };
+      await admin(alex, "select save_gift_for_recipients($1::jsonb)", [input]);
+      const rows = (
+        await db.query(
+          "select p.* from proposals p join ideas i on i.id=p.idea_id where i.title='Indépendante'",
+        )
+      ).rows;
+      assert.equal(rows.length, 2);
+      assert.notEqual(rows[0].idea_id, rows[1].idea_id);
+      await reserve(rows[0].id);
+      assert.equal(
+        (
+          await db.query("select reserved from proposals where id=$1", [
+            rows[1].id,
+          ])
+        ).rows[0].reserved,
+        false,
+      );
+      await assert.rejects(
+        admin(alex, "select save_gift_for_recipients($1::jsonb)", [
+          {
+            ...input,
+            title: "Rollback",
+            candidates: [recipient, randomUUID()],
+          },
+        ]),
+        /unknown_recipient/,
+      );
+      assert.equal(
+        (await db.query("select count(*) from ideas where title='Rollback'"))
+          .rows[0].count,
+        "0",
+      );
+      const common = (
+        await db.query("select id from recipients where is_common")
+      ).rows[0].id;
+      await assert.rejects(
+        admin(alex, "select save_gift_for_recipients($1::jsonb)", [
+          { ...input, candidates: [recipient, common] },
+        ]),
+        /common_is_exclusive/,
       );
     },
   );

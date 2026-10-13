@@ -22,7 +22,7 @@ export default function Admin({
   previews: Record<string, string>;
 }) {
   const router = useRouter();
-  const [view, setView] = useState("ideas"),
+  const [view, setView] = useState("people"),
     [listId, setList] = useState(""),
     [person, setPerson] = useState(""),
     [query, setQuery] = useState(""),
@@ -91,7 +91,7 @@ export default function Admin({
         imageCredit: null,
         priceMin: null,
         priceMax: null,
-        visibility: "household",
+        visibility: "public",
         candidates: [],
         recipientId: null,
         listIds: [],
@@ -216,15 +216,12 @@ export default function Admin({
       if (listId && !inList(p, listId, data.proposals)) return false;
       if (
         person &&
-        !idea.candidates.includes(person) &&
-        p.recipient_id !== person
+        (p.recipient_id
+          ? p.recipient_id !== person
+          : !idea.candidates.includes(person))
       )
         return false;
-      if (
-        view === "unfiled" &&
-        idea.candidates.length &&
-        (p.list_ids.length || p.is_global)
-      )
+      if (view === "unfiled" && (p.recipient_id || idea.candidates.length))
         return false;
       return (
         normalize(
@@ -250,11 +247,11 @@ export default function Admin({
   const currentList = data.lists.find((l) => l.id === listId);
   const currentPerson = data.recipients.find((r) => r.id === person);
   const titles: Record<string, string> = {
-    ideas: "Mes idées",
+    people: "Pour qui",
     lists: "Mes listes",
-    people: "Pour qui ?",
-    archives: "Archives",
+    ideas: "Mes idées",
     unfiled: "À classer",
+    archives: "Archives",
   };
   const activeFilters = [
     person ? currentPerson?.name : "",
@@ -288,7 +285,7 @@ export default function Admin({
   return (
     <>
       <header className="topbar">
-        <button className="brand" onClick={() => navigate("ideas")}>
+        <button className="brand" onClick={() => navigate("people")}>
           Kad’Humbert <span>✳</span>
         </button>
         <button
@@ -330,8 +327,8 @@ export default function Admin({
                           data.ideas.some(
                             (i) =>
                               i.id === p.idea_id &&
-                              (!i.candidates.length ||
-                                (!p.list_ids.length && !p.is_global)),
+                              !i.candidates.length &&
+                              !p.recipient_id,
                           ),
                       ).length
                     }
@@ -438,6 +435,14 @@ export default function Admin({
                 >
                   Modifier la liste
                 </button>
+                <a
+                  className="secondary guest-preview-link"
+                  href={"/l/" + currentList.share_token}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Afficher la liste en mode invité ↗
+                </a>
                 <button onClick={() => setModal("share")}>Partager ↗</button>
                 <button
                   className="secondary"
@@ -502,7 +507,7 @@ export default function Admin({
                           <div className="cover-placeholder">✳</div>
                         )}
                         <button
-                          className="text-button"
+                          className="text-button card-open"
                           onClick={() => {
                             setList(l.id);
                             setQuery("");
@@ -569,7 +574,7 @@ export default function Admin({
                     ).map((r, _, arr) => (
                       <article className="person-card" key={r.id}>
                         <button
-                          className="text-button"
+                          className="text-button card-open"
                           onClick={() => {
                             setPerson(r.id);
                             setQuery("");
@@ -581,11 +586,19 @@ export default function Admin({
                           <h2>{r.name}</h2>
                           <p>
                             {
-                              data.ideas.filter((i) =>
-                                i.candidates.includes(r.id),
+                              data.proposals.filter(
+                                (p) =>
+                                  !p.archived_at &&
+                                  (p.recipient_id
+                                    ? p.recipient_id === r.id
+                                    : data.ideas.some(
+                                        (i) =>
+                                          i.id === p.idea_id &&
+                                          i.candidates.includes(r.id),
+                                      )),
                               ).length
                             }{" "}
-                            idées possibles
+                            idées
                           </p>
                         </button>
                         <button
@@ -864,7 +877,7 @@ export default function Admin({
                             </div>
                             <div className="gift-body">
                               <button
-                                className="text-button"
+                                className="text-button card-open"
                                 onClick={() => {
                                   setReuse(false);
                                   setForm(p);
@@ -891,14 +904,19 @@ export default function Admin({
                                 </b>
                               </p>
                               <p>{formatPrice(i.price_min, i.price_max)}</p>
-                              <small>
-                                {p.is_global
-                                  ? "✨ Toutes les listes"
-                                  : data.lists
-                                      .filter((l) => p.list_ids.includes(l.id))
-                                      .map((l) => l.name)
-                                      .join(" · ")}
-                              </small>
+                              <div className="list-tags">
+                                {data.lists
+                                  .filter(
+                                    (l) =>
+                                      inList(p, l.id, data.proposals) &&
+                                      !l.archived_at,
+                                  )
+                                  .map((l) => (
+                                    <span className="list-tag" key={l.id}>
+                                      ▤ {l.name}
+                                    </span>
+                                  ))}
+                              </div>
                               {p.collective && (
                                 <p>
                                   {Number(p.contributed).toLocaleString(
@@ -1120,6 +1138,10 @@ export default function Admin({
             draft={form === "new" ? draft : undefined}
             done={done}
             onDraft={checkDraft}
+            defaultRecipientId={
+              form === "new" ? person || undefined : undefined
+            }
+            defaultListId={form === "new" ? listId || undefined : undefined}
           />
           {form !== "new" && (
             <details>
