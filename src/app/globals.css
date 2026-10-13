@@ -849,3 +849,18 @@ dialog > header h2 {
 .gift-card .card-open:hover {
   filter: none;
 }
+
+/* Native card clicks work on images, text and empty space; nested controls remain independent. */
+.gift-card,
+.list-card {
+  cursor: pointer;
+}
+.gift-card .card-open::after,
+.list-card .card-open::after {
+  content: none;
+}
+.gift-card:has(.card-open:focus-visible),
+.list-card:has(.card-open:focus-visible) {
+  outline: 3px solid var(--purple);
+  outline-offset: 3px;
+}

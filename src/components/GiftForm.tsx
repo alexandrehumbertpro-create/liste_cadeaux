@@ -149,13 +149,15 @@ export default function GiftForm({
       if (!r.ok) throw new Error(d.error || "La récupération a échoué.");
       set((old) => ({
         ...old,
-        title: old.title || d.title || "",
-        description: old.description || d.description || "",
-        imageUrl: old.imageUrl || d.image || "",
-        priceMin: old.priceMin ?? d.price ?? null,
+        title: d.title || old.title || "",
+        description: d.description || old.description || "",
+        imageUrl: d.image || old.imageUrl || "",
+        imageCredit: d.image ? null : old.imageCredit,
+        priceMin: d.price ?? old.priceMin ?? null,
+        priceMax: d.price != null ? null : old.priceMax,
       }));
-      if (!v.imageUrl) {
-        setImage(d.image ?? "");
+      if (d.image) {
+        setImage(d.image);
         setImageFailed(false);
       }
       const found = [

@@ -45,9 +45,27 @@ const origin = process.env.TEST_APP_URL || "http://localhost:3000";
     await p
       .locator(".gift-image img,.gift-image > span:not(.badge)")
       .first()
-      .click({ force: true });
+      .click();
     await p.getByRole("dialog").waitFor();
     await p.getByRole("button", { name: "Fermer", exact: true }).click();
+    const firstCard = p.locator(".gift-card").first();
+    await firstCard.locator(".recipient").click();
+    await p.getByRole("dialog").waitFor();
+    await p.getByRole("button", { name: "Fermer", exact: true }).click();
+    const box = await firstCard.boundingBox();
+    await firstCard.click({
+      position: { x: box.width - 6, y: box.height / 2 },
+    });
+    await p.getByRole("dialog").waitFor();
+    await p.getByRole("button", { name: "Fermer", exact: true }).click();
+    await firstCard.getByRole("checkbox").check();
+    assert.equal(await p.getByRole("dialog").count(), 0);
+    await firstCard.getByRole("checkbox").uncheck();
+    await firstCard.locator(".card-open").focus();
+    await p.keyboard.press("Enter");
+    await p.getByRole("dialog").waitFor();
+    await p.getByRole("button", { name: "Fermer", exact: true }).click();
+
     await p.getByRole("button", { name: "+ Idée", exact: true }).last().click();
     if (await p.getByRole("button", { name: /nouvelle idée/i }).count())
       await p.getByRole("button", { name: /nouvelle idée/i }).click();
@@ -108,7 +126,7 @@ const origin = process.env.TEST_APP_URL || "http://localhost:3000";
     await p
       .locator(".list-card img,.list-card .cover-placeholder")
       .first()
-      .click({ force: true });
+      .click();
     const preview = p.getByRole("link", {
       name: "Afficher la liste en mode invité ↗",
     });

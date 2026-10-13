@@ -107,6 +107,33 @@ async function get(
     request.on("error", reject);
   });
 }
+export function productUrl(value: string) {
+  const url = new URL(value);
+  for (const key of [...url.searchParams.keys()]) {
+    if (
+      /^utm_/i.test(key) ||
+      [
+        "gclid",
+        "gbraid",
+        "wbraid",
+        "gad_source",
+        "gad_campaignid",
+        "cid",
+        "cm_mmc",
+        "fbclid",
+        "msclkid",
+      ].includes(key.toLowerCase())
+    )
+      url.searchParams.delete(key);
+  }
+  url.hash = "";
+  return url;
+}
+function homepage(url: URL) {
+  return (
+    /^\/(?:[a-z]{2}(?:[-_][a-z]{2})?)?\/?$/i.test(url.pathname) && !url.search
+  );
+}
 export function parseMetadata(html: string, baseUrl: string) {
   const $ = load(html);
   const meta = (name: string) =>
@@ -131,22 +158,91 @@ export function parseMetadata(html: string, baseUrl: string) {
       visit(JSON.parse($(el).text()));
     } catch {}
   });
-  const product = objects.find((o) =>
+  const text = (value: unknown) =>
+    typeof value === "string" ? value.trim() : "";
+  const pageUrl = new URL(baseUrl);
+  const samePage = (value: unknown) => {
+    try {
+      const candidate = new URL(text(value), pageUrl);
+      return (
+        Boolean(text(value)) &&
+        candidate.origin === pageUrl.origin &&
+        candidate.pathname.replace(/\/$/, "") ===
+          pageUrl.pathname.replace(/\/$/, "") &&
+        (candidate.pathname !== "/" ||
+          productUrl(candidate.href).search === productUrl(pageUrl.href).search)
+      );
+    } catch {
+      return false;
+    }
+  };
+  const heading = $("h1").first().text().trim();
+  const products = objects.filter((o) =>
     [o["@type"]]
       .flat()
       .some((t) => typeof t === "string" && /(?:^|[/#])Product$/.test(t)),
   );
+  const score = (o: Record<string, any>) => {
+    const matchesUrl = [
+      o.url,
+      o["@id"],
+      ...[o.offers].flat().map((offer) => offer?.url),
+    ].some(samePage);
+    const matchesHeading =
+      heading &&
+      text(o.name).toLocaleLowerCase() === heading.toLocaleLowerCase();
+    return (matchesUrl ? 100 : 0) + (matchesHeading ? 50 : 0);
+  };
+  const product = [...products]
+    .sort((a, b) => score(b) - score(a))
+    .find((o) => products.length === 1 || score(o) > 0);
+  const scope = $('[itemscope][itemtype*="schema.org/Product"]').first();
+  const declaredUrl =
+    $('link[rel="canonical"]').first().attr("href") || meta("og:url");
+  if (!product && !scope.length && declaredUrl && !homepage(pageUrl)) {
+    try {
+      if (homepage(new URL(declaredUrl, pageUrl)))
+        throw new Error(
+          "Les détails de cette fiche produit ne sont pas disponibles : le site renvoie les informations de sa page d’accueil.",
+        );
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Les détails"))
+        throw error;
+    }
+  }
+
+  const property = (name: string) => {
+    const element = scope.find(`[itemprop="${name}"]`).first();
+    return (
+      element.attr("content") ||
+      element.attr("src") ||
+      element.attr("href") ||
+      element.text().trim()
+    );
+  };
   const offer = product
-    ? [product.offers].flat().find((o) => o && typeof o === "object")
+    ? [product.offers]
+        .flat()
+        .find(
+          (o) =>
+            o &&
+            typeof o === "object" &&
+            (o.price != null ||
+              o.lowPrice != null ||
+              o.priceSpecification?.price != null),
+        )
     : undefined;
   const productImage = [product?.image].flat().find(Boolean);
   const rawImage =
-    meta("og:image:secure_url") ||
-    meta("og:image") ||
-    meta("twitter:image") ||
     (typeof productImage === "string"
       ? productImage
       : productImage?.url || productImage?.contentUrl) ||
+    property("image") ||
+    $('[itemprop="image"]').first().attr("src") ||
+    $('[itemprop="image"]').first().attr("content") ||
+    meta("og:image:secure_url") ||
+    meta("og:image") ||
+    meta("twitter:image") ||
     $('link[rel="image_src"]').attr("href") ||
     "";
   let image = "";
@@ -156,18 +252,20 @@ export function parseMetadata(html: string, baseUrl: string) {
       rawImage &&
       ["http:", "https:"].includes(resolved.protocol) &&
       !resolved.username &&
-      !resolved.password
+      !resolved.password &&
+      !/(?:^|[\/_.-])(?:logo|favicon)(?:[\/_.-]|$)/i.test(resolved.pathname)
     )
       image = resolved.href;
   } catch {}
   const rawPrice =
-    meta("product:price:amount") ||
-    meta("og:price:amount") ||
-    offer?.price ||
-    offer?.lowPrice ||
-    offer?.priceSpecification?.price ||
-    $('[itemprop="price"]').first().attr("content") ||
-    $('[itemprop="price"]').first().text();
+    offer?.price ??
+    offer?.lowPrice ??
+    offer?.priceSpecification?.price ??
+    (property("price") ||
+      meta("product:price:amount") ||
+      meta("og:price:amount") ||
+      $('[itemprop="price"]').first().attr("content") ||
+      $('[itemprop="price"]').first().text());
   const normalized = String(rawPrice ?? "").replace(/[\s\u00a0€$£]/g, "");
   const numberPrice = Number(
     normalized.includes(",") && normalized.includes(".")
@@ -178,16 +276,19 @@ export function parseMetadata(html: string, baseUrl: string) {
   );
   return {
     title: (
+      text(product?.name) ||
+      property("name") ||
+      heading ||
       meta("og:title") ||
-      product?.name ||
       meta("twitter:title") ||
       $("title").first().text()
     )
       .trim()
       .slice(0, 200),
     description: (
+      text(product?.description) ||
+      property("description") ||
       meta("og:description") ||
-      product?.description ||
       meta("description") ||
       meta("twitter:description") ||
       ""
@@ -202,6 +303,11 @@ export function parseMetadata(html: string, baseUrl: string) {
   };
 }
 export async function extractMetadata(value: string) {
-  const result = await get(new URL(value));
+  const requested = productUrl(value);
+  const result = await get(requested);
+  if (!homepage(requested) && homepage(result.url))
+    throw new Error(
+      "Ce lien redirige vers la page d’accueil du site. Les informations du produit ne sont pas disponibles.",
+    );
   return parseMetadata(result.html, result.url.href);
 }

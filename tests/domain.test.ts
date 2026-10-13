@@ -4,7 +4,7 @@ import {
   giftInput,
   reservationInput,
 } from "../src/lib/validation";
-import { publicAddress, parseMetadata } from "../src/lib/metadata";
+import { publicAddress, parseMetadata, productUrl } from "../src/lib/metadata";
 describe("Filtres de budget", () => {
   it("inclut les fourchettes qui se recoupent", () => {
     expect(budgetOverlap(40, 80, null, 50)).toBe(true);
@@ -108,5 +108,60 @@ describe("Informations produit", () => {
     expect(
       parseMetadata("<title>Un cadeau</title>", "https://shop.example").price,
     ).toBe(null);
+  });
+});
+
+describe("Fiche produit plutôt que site général", () => {
+  it("préfère le produit aux métadonnées générales du site", () => {
+    const html = `<meta property="og:title" content="La boutique"><meta property="og:image" content="/logo.png"><meta property="og:description" content="Bienvenue"><meta property="product:price:amount" content="999"><script type="application/ld+json">{"@type":"Product","name":"Lampe bleue","description":"Lampe de bureau","image":"/lampe.jpg","offers":{"price":"45"}}</script>`;
+    expect(parseMetadata(html, "https://shop.example/lampe")).toEqual({
+      title: "Lampe bleue",
+      description: "Lampe de bureau",
+      image: "https://shop.example/lampe.jpg",
+      price: 45,
+    });
+  });
+  it("sélectionne le produit de cette URL plutôt que la première recommandation", () => {
+    const html = `<script type="application/ld+json">[{"@type":"Product","name":"Autre cadeau","url":"/autre","image":"/autre.jpg"},{"@type":"Product","name":"Lampe bleue","url":"/lampe","image":"/lampe.jpg","offers":{"price":45}}]</script>`;
+    expect(parseMetadata(html, "https://shop.example/lampe").title).toBe(
+      "Lampe bleue",
+    );
+  });
+  it("lit les informations dans le bloc microdata du produit", () => {
+    const html = `<meta property="og:title" content="La boutique"><meta property="og:image" content="/logo.png"><div itemscope itemtype="https://schema.org/Product"><h1 itemprop="name">Lampe bleue</h1><img itemprop="image" src="/lampe.jpg"><meta itemprop="price" content="45"></div>`;
+    expect(parseMetadata(html, "https://shop.example/lampe")).toMatchObject({
+      title: "Lampe bleue",
+      image: "https://shop.example/lampe.jpg",
+      price: 45,
+    });
+  });
+});
+
+describe("Liens marchands", () => {
+  it("retire la publicité mais conserve la fiche et l’offre Cdiscount", () => {
+    const url = productUrl(
+      "https://www.cdiscount.com/le-sport/produit/f-1214805-urb3700092645444.html?o=4330165634&p=179.99&cid=search_pla&cm_mmc=PLA&gclid=tracking&gbraid=tracking",
+    );
+    expect(url.pathname).toBe(
+      "/le-sport/produit/f-1214805-urb3700092645444.html",
+    );
+    expect(url.search).toBe("?o=4330165634&p=179.99");
+  });
+  it("signale une page générique à la place de remplir avec le logo du site", () => {
+    expect(() =>
+      parseMetadata(
+        '<link rel="canonical" href="https://www.cdiscount.com/"><meta property="og:title" content="Cdiscount"><meta property="og:image" content="/logo.png">',
+        "https://www.cdiscount.com/fiche-produit.html",
+      ),
+    ).toThrow(/fiche produit/);
+  });
+});
+
+it("préfère le titre de la fiche HTML et n’importe pas un logo comme photo produit", () => {
+  const html =
+    '<meta property="og:title" content="La boutique"><meta property="og:image" content="/images/site-logo.png"><h1>Trottinette électrique</h1>';
+  expect(parseMetadata(html, "https://shop.example/produit")).toMatchObject({
+    title: "Trottinette électrique",
+    image: "",
   });
 });

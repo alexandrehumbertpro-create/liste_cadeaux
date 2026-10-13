@@ -24,3 +24,9 @@ L’application n’est pas publiée. La configuration réutilisable de l’envi
 - 13 parcours navigateur de régression avec GoTrue/PostgREST réels en local.
 - 2 parcours supplémentaires à 390 et 1440 px : nouvel accueil, grilles, clic sur image, aperçu de récupération, absence des anciens champs, attribution multiple, À classer et raccourci invité. La réponse metadata est simulée pour les contrôles UI ; le parseur est testé séparément. L’extraction sur un site marchand réel n’a pas été vérifiée dans cette session.
 - Migration distante et déploiement : à faire après application du fichier `202610130001_simplify_capture.sql`. Aucun changement appliqué au projet Supabase distant ni à Vercel dans cette session.
+
+## Correction des cartes et des fiches produit
+
+- 15 tests unitaires passent : priorité aux données Product JSON-LD et microdata, sélection du produit correspondant à l’URL, titre HTML de la fiche, exclusion des logos, signalement d’une page générale, retrait des paramètres publicitaires tout en conservant l’offre.
+- Les parcours à 390 et 1440 px vérifient les clics sur image, destinataire, espace de la carte et ouverture au clavier, sans ouvrir la fiche lors de la sélection d’une case. Les boutons et liens restent indépendants.
+- Cdiscount : fiche fournie par l’utilisateur non consultée dans cette session, car le proxy Codex refuse le domaine (HTTP 403 CONNECT). Accès ajouté au brouillon réseau Codex ; publication de l’environnement nécessaire avant validation sur la fiche réelle. Ne pas présenter la récupération Cdiscount comme vérifiée.

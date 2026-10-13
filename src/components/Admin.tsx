@@ -500,7 +500,20 @@ export default function Admin({
                           ),
                       ),
                     ).map((l, _, arr) => (
-                      <article className="list-card" key={l.id}>
+                      <article
+                        className="list-card"
+                        key={l.id}
+                        onClick={(event) => {
+                          if (
+                            (event.target as HTMLElement).closest(
+                              "button,a,input,label,select,textarea,summary",
+                            )
+                          )
+                            return;
+                          setList(l.id);
+                          setQuery("");
+                        }}
+                      >
                         {previews[l.id] ? (
                           <img src={previews[l.id]} alt="" />
                         ) : (
@@ -843,6 +856,16 @@ export default function Admin({
                         return (
                           <article
                             key={p.id}
+                            onClick={(event) => {
+                              if (
+                                (event.target as HTMLElement).closest(
+                                  "button,a,input,label,select,textarea,summary",
+                                )
+                              )
+                                return;
+                              setReuse(false);
+                              setForm(p);
+                            }}
                             className={
                               "gift-card " +
                               (reserved ? "reserved " : "") +
