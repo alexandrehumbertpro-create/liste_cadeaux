@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       {
         error:
           error instanceof Error &&
-          /^(Ce lien|Les détails|La page|Page trop|Trop de redirections)/.test(
+          /^(Ce lien|Le site marchand|Les détails|La page|Page trop|Trop de redirections)/.test(
             error.message,
           )
             ? error.message

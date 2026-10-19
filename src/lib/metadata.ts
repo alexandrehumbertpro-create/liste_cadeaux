@@ -76,6 +76,19 @@ async function get(
           return;
         }
         if (
+          res.statusCode === 401 ||
+          res.statusCode === 403 ||
+          res.statusCode === 429
+        ) {
+          res.resume();
+          reject(
+            new Error(
+              "Le site marchand bloque l’accès automatique à cette fiche produit.",
+            ),
+          );
+          return;
+        }
+        if (
           res.statusCode !== 200 ||
           !res.headers["content-type"]?.includes("text/html")
         ) {
@@ -136,6 +149,17 @@ function homepage(url: URL) {
 }
 export function parseMetadata(html: string, baseUrl: string) {
   const $ = load(html);
+  const pageTitle = $("title").first().text().trim();
+  if (
+    /^(?:acc[eè]s\s+(?:bloqu[eé]|refus[eé])|access\s+(?:denied|blocked)|just a moment|attention required|security check)/i.test(
+      pageTitle,
+    ) ||
+    $("#challenge-form,#cf-challenge-running,.cf-error-details").length
+  ) {
+    throw new Error(
+      "Le site marchand bloque l’accès automatique à cette fiche produit.",
+    );
+  }
   const meta = (name: string) =>
     $(`meta[property="${name}"],meta[name="${name}"]`)
       .first()

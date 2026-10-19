@@ -30,3 +30,7 @@ L’application n’est pas publiée. La configuration réutilisable de l’envi
 - 15 tests unitaires passent : priorité aux données Product JSON-LD et microdata, sélection du produit correspondant à l’URL, titre HTML de la fiche, exclusion des logos, signalement d’une page générale, retrait des paramètres publicitaires tout en conservant l’offre.
 - Les parcours à 390 et 1440 px vérifient les clics sur image, destinataire, espace de la carte et ouverture au clavier, sans ouvrir la fiche lors de la sélection d’une case. Les boutons et liens restent indépendants.
 - Cdiscount : fiche fournie par l’utilisateur non consultée dans cette session, car le proxy Codex refuse le domaine (HTTP 403 CONNECT). Accès ajouté au brouillon réseau Codex ; publication de l’environnement nécessaire avant validation sur la fiche réelle. Ne pas présenter la récupération Cdiscount comme vérifiée.
+
+## Vérification du lien Cdiscount De’Longhi — 19 octobre 2026
+
+Le lien fourni a été demandé sans son fragment de navigation. Le tunnel HTTPS a abouti ; la réponse de la destination est HTTP 403 avec une page HTML intitulée « Accès bloquéCdiscount.fr », sans données Open Graph, JSON-LD ni titre de produit. L’extraction automatique de ce produit n’est donc pas validée. Le code distingue maintenant les blocages HTTP 401/403/429 et les pages de vérification servies en HTML ; ces pages ne doivent jamais préremplir une idée avec leur titre. Aucun prix ni image n’a été déduit du lien ou inventé.

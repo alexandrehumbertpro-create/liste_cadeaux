@@ -165,3 +165,24 @@ it("préfère le titre de la fiche HTML et n’importe pas un logo comme photo p
     image: "",
   });
 });
+
+describe("Pages de blocage marchand", () => {
+  it("ne prend pas la page Accès bloqué Cdiscount pour un produit", () => {
+    const html =
+      "<title>Accès bloquéCdiscount.fr</title><body>Cdiscount.fr Accès bloqué</body>";
+    expect(() =>
+      parseMetadata(
+        html,
+        "https://www.cdiscount.com/electromenager/petit-dejeuner-cafe/machine-expresso-manuelle-de-longhi-dedica-sty/f-1101727-del8004399331198.html",
+      ),
+    ).toThrow(/site marchand bloque/);
+  });
+  it("détecte aussi une page de vérification renvoyée avec un titre de boutique", () => {
+    expect(() =>
+      parseMetadata(
+        '<title>La boutique</title><form id="challenge-form"></form>',
+        "https://shop.example/produit",
+      ),
+    ).toThrow(/site marchand bloque/);
+  });
+});
