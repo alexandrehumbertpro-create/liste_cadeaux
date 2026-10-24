@@ -1,6 +1,6 @@
 # Activer les emails Gmail de Kad’Humbert
 
-Les emails d’ajout d’idée et les partages rapides sont envoyés depuis le compte Gmail de l’administrateur connecté. Aucun mot de passe Gmail n’est demandé ni stocké. Les anciennes notifications de réservation continuent d’utiliser Resend.
+Les emails d’ajout d’idée et les partages rapides sont envoyés depuis le compte Gmail de l’administrateur connecté. Aucun mot de passe Gmail n’est demandé ni stocké. Les confirmations de réservation, annulations, changements et notifications aux administrateurs partent du Gmail d’Alex (profil administrateur nommé « Alex »). Aucun compte Resend ni domaine d’expédition ne sont nécessaires. La connexion Gmail d’Elise ne remplace jamais automatiquement celle d’Alex pour ces messages.
 
 ## Avant le déploiement
 
@@ -42,7 +42,7 @@ Relancer le déploiement après l’enregistrement des variables.
 4. Vérifier le message « Votre Gmail est connecté ».
 5. Refaire les étapes avec le compte Elise.
 
-Après connexion, les emails déjà préparés en attente sont réessayés. Le bouton « Réessayer les emails en attente » permet de relancer un envoi refusé temporairement. En mode Test Google, un jeton peut expirer après sept jours : une reconnexion sera alors nécessaire. Le passage en production et les éventuelles exigences de vérification se règlent dans Google Auth Platform.
+Après connexion, les emails déjà préparés en attente sont réessayés. Alex peut aussi relancer les notifications de réservation via « Réessayer les emails en attente ». Si son Gmail est déconnecté ou son autorisation expirée, les messages restent en attente ; aucun succès de livraison n’est annoncé. Le bouton « Réessayer les emails en attente » permet de relancer un envoi refusé temporairement. En mode Test Google, un jeton peut expirer après sept jours : une reconnexion sera alors nécessaire. Le passage en production et les éventuelles exigences de vérification se règlent dans Google Auth Platform.
 
 ## Confidentialité et limites
 

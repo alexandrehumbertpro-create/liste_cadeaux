@@ -1,5 +1,4 @@
 import "server-only";
-import { Resend } from "resend";
 import { gmailConfigured, sendGmail, type InlineImage } from "./gmail";
 import { serviceClient } from "./supabase/server";
 const escape = (s: unknown) =>
@@ -10,22 +9,42 @@ const escape = (s: unknown) =>
         c
       ]!,
   );
+// The automatic sender is deliberately Alex, never whichever administrator
+// happens to be logged in or the first connected mailbox.
+export async function transactionalSenderId() {
+  if (!gmailConfigured()) return null;
+  const db = serviceClient();
+  const { data: alex } = await db
+    .from("profiles")
+    .select("id,email")
+    .ilike("display_name", "Alex")
+    .maybeSingle();
+  if (!alex) return null;
+  const { data: connection } = await db
+    .from("admin_mailboxes")
+    .select("email")
+    .eq("profile_id", alex.id)
+    .maybeSingle();
+  return connection?.email.toLowerCase() === alex.email.toLowerCase()
+    ? alex.id
+    : null;
+}
 export async function drainEmails() {
-  const resend = Boolean(
-    process.env.RESEND_API_KEY && process.env.EMAIL_FROM && process.env.APP_URL,
-  );
   const gmail = gmailConfigured();
-  if (!resend && !gmail)
+  const automaticSender = await transactionalSenderId();
+  if (!gmail)
     return {
       configured: false,
-      resendConfigured: false,
+      transactionalConfigured: false,
       gmailConfigured: false,
       sent: 0,
     };
   const db = serviceClient();
   const jobs: any[] = [];
   for (const provider of [
-    ...(resend ? ["resend"] : []),
+    // "resend" is the legacy SQL queue selector for reservation jobs.
+    // Retaining it avoids a database migration; delivery below uses Gmail.
+    ...(automaticSender ? ["resend"] : []),
     ...(gmail ? ["gmail"] : []),
   ]) {
     const result = await db.rpc("claim_email_jobs_for_provider", { provider });
@@ -174,18 +193,16 @@ export async function drainEmails() {
         : "";
     const html = `<h1>Kad’Humbert</h1><p>${escape(subjects[job.kind] || "Votre réservation")} : ${title}</p>${job.kind === "admin_reserved" ? "<p>Le nom du réservant reste masqué. Consultez votre carnet pour en savoir plus.</p>" : `<p><a href="${escape(url)}">Consulter ou annuler ma réservation</a></p>`}${recap}<p>Pour les âmes en panne d’inspiration</p>`;
     try {
-      const { error: sendError } = await new Resend(
-        process.env.RESEND_API_KEY,
-      ).emails.send(
-        {
-          from: process.env.EMAIL_FROM!,
-          to: job.email,
-          subject: subjects[job.kind] || "Kad’Humbert",
-          html,
-        },
-        { idempotencyKey: job.id },
+      if (!automaticSender)
+        throw Error(
+          "Connectez le Gmail d’Alex pour envoyer les notifications de réservation.",
+        );
+      await sendGmail(
+        automaticSender,
+        job.email,
+        subjects[job.kind] || "Kad’Humbert",
+        html,
       );
-      if (sendError) throw new Error("Envoi refusé");
       await db
         .from("email_jobs")
         .update({ status: "sent", last_error: null })
@@ -196,14 +213,15 @@ export async function drainEmails() {
         .from("email_jobs")
         .update({
           status: "pending",
-          last_error: "Échec fournisseur, réessai prévu.",
+          last_error:
+            "Envoi automatique Gmail en attente. Vérifiez la connexion Gmail d’Alex, puis réessayez.",
         })
         .eq("id", job.id);
     }
   }
   return {
     configured: true,
-    resendConfigured: resend,
+    transactionalConfigured: Boolean(automaticSender),
     gmailConfigured: gmail,
     sent,
   };

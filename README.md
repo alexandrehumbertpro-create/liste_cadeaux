@@ -2,7 +2,7 @@
 
 Pour les âmes en panne d’inspiration.
 
-Application web responsive : Next.js 16, React 19, TypeScript, Supabase (authentification, PostgreSQL, stockage privé), Resend et Unsplash. L’application réelle est dans `src/`. La maquette autonome historique reste dans `maquette/`.
+Application web responsive : Next.js 16, React 19, TypeScript, Supabase (authentification, PostgreSQL, stockage privé), Gmail et Unsplash. L’application réelle est dans `src/`. La maquette autonome historique reste dans `maquette/`.
 
 ## Démarrer
 
@@ -21,8 +21,8 @@ Configurez les variables dans `.env.local` ou dans les paramètres sécurisés d
 | NEXT_PUBLIC_SUPABASE_ANON_KEY | Clé publique du projet |
 | SUPABASE_SERVICE_ROLE_KEY | Clé serveur ; ne jamais mettre dans une variable NEXT_PUBLIC |
 | APP_URL | URL de l’application (HTTPS en production) |
-| RESEND_API_KEY | Envoi des emails |
-| EMAIL_FROM | Adresse d’envoi sur un domaine vérifié dans Resend |
+| GOOGLE_CLIENT_ID | ID du client OAuth Google |
+| GOOGLE_CLIENT_SECRET | Secret du client OAuth Google |
 | UNSPLASH_ACCESS_KEY | Recherche et sélection d’illustrations |
 | CRON_SECRET | Secret aléatoire protégeant les relances email |
 
@@ -57,9 +57,9 @@ Les brouillons sont propres au compte **et à l’appareil**, pas synchronisés 
 
 ## Emails
 
-Une file transactionnelle enregistre les emails au moment de la réservation, de l’annulation et des changements importants. Sans clé Resend, les tâches restent en attente ; aucun email n’est prétendu envoyé. Chaque envoi utilise une clé d’idempotence, avec dix tentatives maximum. Configurez un appel planifié régulier à `GET /api/mail` avec `Authorization: Bearer CRON_SECRET` pour traiter les reprises et les tâches restantes. Les actions traitent aussi un lot immédiatement. Les notifications gestionnaire n’affichent pas les noms des réservants. La fréquence disponible est à chaque réservation ou désactivée ; aucun résumé quotidien ni notification push n’est implémenté. Le choix de recevoir ces notifications se fait dans le compte.
+Une file transactionnelle enregistre les emails au moment de la réservation, de l’annulation et des changements importants. Les emails automatiques partent du Gmail du profil administrateur Alex. Sans sa connexion Gmail, les tâches restent en attente ; aucun email n’est prétendu envoyé. La file réserve chaque tâche avant livraison, avec dix tentatives maximum. Gmail ne propose pas de clé d’idempotence : une interruption après acceptation du message peut entraîner un doublon au réessai. Configurez un appel planifié régulier à `GET /api/mail` avec `Authorization: Bearer CRON_SECRET` pour traiter les reprises et les tâches restantes. Les actions traitent aussi un lot immédiatement. Les notifications gestionnaire n’affichent pas les noms des réservants. La fréquence disponible est à chaque réservation ou désactivée ; aucun résumé quotidien ni notification push n’est implémenté. Le choix de recevoir ces notifications se fait dans le compte.
 
-Avant publication : renseignez vos services, vérifiez une vraie livraison d’email, la recherche Unsplash, l’import d’une photo et l’ouverture du lien depuis un téléphone externe. Configurez les URL d’authentification Supabase, le domaine Resend et un hébergement HTTPS Next.js. `npm run build` puis `npm start` démarrent la version de production ; la publication reste à effectuer sur votre hébergeur.
+Avant publication : renseignez vos services, vérifiez une vraie livraison d’email, la recherche Unsplash, l’import d’une photo et l’ouverture du lien depuis un téléphone externe. Configurez les URL d’authentification Supabase, la connexion Gmail d’Alex et un hébergement HTTPS Next.js. `npm run build` puis `npm start` démarrent la version de production ; la publication reste à effectuer sur votre hébergeur.
 
 ## Vérifier
 

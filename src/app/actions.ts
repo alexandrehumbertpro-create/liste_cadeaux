@@ -10,7 +10,7 @@ import {
   serviceClient,
 } from "@/lib/supabase/server";
 import { giftInput, reservationInput, imageReference } from "@/lib/validation";
-import { drainEmails } from "@/lib/mail";
+import { drainEmails, transactionalSenderId } from "@/lib/mail";
 import { gmailConfigured, mailbox } from "@/lib/gmail";
 import { signImage } from "@/lib/images";
 export type Result<T = unknown> =
@@ -189,7 +189,10 @@ export async function resetGift(
     if (error) throw new Error(error.message);
     revalidatePath("/");
     const delivery = await drainEmails();
-    return { ok: true, data: { emailConfigured: delivery.resendConfigured } };
+    return {
+      ok: true,
+      data: { emailConfigured: delivery.transactionalConfigured },
+    };
   } catch (e) {
     return { ok: false, error: message(e) };
   }
@@ -564,6 +567,14 @@ export async function retryMyEmails(): Promise<Result> {
       .update({ attempts: 0 })
       .eq("status", "pending")
       .eq("payload->>senderProfileId", user.id);
+    // Only the designated automatic sender may restart reservation jobs.
+    if ((await transactionalSenderId()) === user.id) {
+      await serviceClient()
+        .from("email_jobs")
+        .update({ attempts: 0 })
+        .eq("status", "pending")
+        .not("kind", "in", "(idea_added,quick_share)");
+    }
     await drainEmails();
     return { ok: true, notice: "Les emails en attente ont été réessayés." };
   } catch (e) {

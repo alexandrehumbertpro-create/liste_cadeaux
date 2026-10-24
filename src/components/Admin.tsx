@@ -1841,7 +1841,10 @@ export default function Admin({
           <section className="gmail-settings">
             <h3>Envoi depuis mon compte Gmail</h3>
             <p>
-              Les emails préparés en attente seront envoyés après la connexion.
+              Les partages et alertes d’ajout partent de votre Gmail. Les
+              confirmations de réservation, annulations et notifications
+              automatiques partent du Gmail d’Alex. Les emails en attente seront
+              réessayés après la connexion.
             </p>
             <p>
               {data.mailbox
