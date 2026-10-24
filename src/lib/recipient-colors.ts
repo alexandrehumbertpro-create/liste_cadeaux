@@ -1,5 +1,7 @@
 export const recipientPalette = [
-  { name: "Lavande", value: "#eee5fc" },
+  { name: "Bleu surprise", value: "#3155ff" },
+  { name: "Citron vert", value: "#d8f36a" },
+  { name: "Bleu doux", value: "#e9eeff" },
   { name: "Rose", value: "#f9dce6" },
   { name: "Pêche", value: "#ffe1c2" },
   { name: "Menthe", value: "#d7efdf" },
@@ -18,8 +20,8 @@ export function recipientColors(
     ),
   );
 }
-export function recipientStyle(color = "#eee5fc") {
-  if (!/^#[0-9a-f]{6}$/i.test(color)) color = "#eee5fc";
+export function recipientStyle(color = "#e9eeff") {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) color = "#e9eeff";
   const channels = [1, 3, 5]
     .map((i) => parseInt(color.slice(i, i + 2), 16) / 255)
     .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));

@@ -1,4 +1,5 @@
 "use client";
+import Brand from "@/components/Brand";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { SharedList, SharedGift } from "@/lib/types";
@@ -44,7 +45,7 @@ export default function Guest({
     <>
       <header className="topbar">
         <a href={"/l/" + token} className="brand">
-          Kad’Humbert <span>✳</span>
+          <Brand />
         </a>
         <small>La liste qu’on vous a partagée</small>
       </header>
@@ -147,7 +148,11 @@ export default function Guest({
                             {g.imageUrl ? (
                               <img src={g.imageUrl} alt="" />
                             ) : (
-                              <span>✳</span>
+                              <img
+                                className="placeholder-mark"
+                                src="/brand-mark.svg"
+                                alt=""
+                              />
                             )}
                             <span className="badge">
                               {

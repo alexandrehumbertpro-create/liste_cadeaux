@@ -104,7 +104,7 @@ export default function GiftForm({
     [metadataStatus, setMetadataStatus] = useState(""),
     [metadataError, setMetadataError] = useState(""),
     [newPersonName, setNewPersonName] = useState<string | null>(null),
-    [newPersonColor, setNewPersonColor] = useState("#eee5fc"),
+    [newPersonColor, setNewPersonColor] = useState("#e9eeff"),
     [imageFailed, setImageFailed] = useState(false),
     [q, setQ] = useState(""),
     [photos, setPhotos] = useState<
@@ -450,7 +450,7 @@ export default function GiftForm({
             className="chip"
             onClick={() => {
               setNewPersonName("");
-              setNewPersonColor("#eee5fc");
+              setNewPersonColor("#e9eeff");
             }}
           >
             + Personne

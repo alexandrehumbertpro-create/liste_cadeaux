@@ -7,7 +7,7 @@ export function ideaShareText(
 ) {
   const person = recipients.find((r) => r.id === proposal.recipient_id)?.name;
   return [
-    "🎁 Une idée cadeau sur Kad’Humbert",
+    "🎁 Une idée cadeau sur La Hotte Humbert",
     idea.title,
     person ? "Pour : " + person : "",
     formatPrice(idea.price_min, idea.price_max),

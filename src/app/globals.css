@@ -1,18 +1,19 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap");
 :root {
-  --ink: #30223b;
-  --purple: #7152c6;
-  --pink: #ffd4df;
-  --cream: #fff8ee;
-  --line: #e6dcd9;
-  --muted: #6c6270;
+  --ink: #17213b;
+  --blue: #3155ff;
+  --lime: #d8f36a;
+  --lime-soft: #f0f9cd;
+  --canvas: #f7f9ff;
+  --line: #e3e8f2;
+  --muted: #5c657a;
 }
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
-  background: var(--cream);
+  background: var(--canvas);
   color: var(--ink);
   font:
     16px "DM Sans",
@@ -21,7 +22,8 @@ body {
 h1,
 h2,
 .brand {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 800;
 }
 h1 {
   font-size: clamp(30px, 4vw, 48px);
@@ -36,14 +38,14 @@ p {
   line-height: 1.5;
 }
 a {
-  color: var(--purple);
+  color: var(--blue);
   text-underline-offset: 3px;
 }
 button,
 .file-button {
   font: inherit;
   font-weight: 600;
-  background: var(--purple);
+  background: var(--blue);
   color: white;
   border: 1px solid transparent;
   border-radius: 15px;
@@ -64,7 +66,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #9c61dd;
+  outline: 3px solid #3155ff;
   outline-offset: 3px;
 }
 .secondary {
@@ -92,19 +94,32 @@ summary:focus-visible {
   min-width: 100px;
 }
 .brand {
-  font-size: 27px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   background: none;
+  border: 0;
   color: var(--ink);
   padding: 0;
   text-decoration: none;
-  letter-spacing: -1px;
+  letter-spacing: -1.2px;
+  text-align: left;
 }
-.brand span {
-  color: var(--purple);
-  display: inline-block;
-  transform: rotate(-14deg);
-  font-size: 38px;
+.brand-mark {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+}
+.brand-wordmark {
+  display: block;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 0.98;
+}
+.brand-wordmark strong {
+  display: block;
+  color: var(--blue);
+  font-weight: 900;
 }
 .topbar {
   height: 86px;
@@ -113,11 +128,11 @@ summary:focus-visible {
   align-items: center;
   justify-content: space-between;
   padding: 0 4vw;
-  background: var(--cream);
+  background: var(--canvas);
 }
 .avatar {
   border-radius: 50%;
-  background: var(--pink);
+  background: var(--lime-soft);
   color: var(--ink);
   width: 46px;
   padding: 0;
@@ -149,7 +164,7 @@ nav button {
   padding: 14px;
 }
 nav button.active {
-  background: var(--pink);
+  background: var(--lime-soft);
   color: var(--ink);
 }
 nav small {
@@ -192,7 +207,7 @@ nav small {
   bottom: 24px;
   right: 32px;
   border-radius: 30px;
-  box-shadow: 0 6px 20px #57398940;
+  box-shadow: 0 6px 20px #3155ff40;
   font-size: 20px;
   padding: 14px 25px;
   z-index: 3;
@@ -210,15 +225,15 @@ nav small {
   background: white;
   border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 3px 0 #30223b07;
+  box-shadow: 0 3px 0 #17213b07;
 }
 .gift-card.private {
-  border: 2px dashed var(--purple);
-  background: #f8f2ff;
+  border: 2px dashed var(--blue);
+  background: #f3f6ff;
 }
 .gift-image {
   height: 205px;
-  background: #f6dce0;
+  background: #eef2ff;
   position: relative;
   display: flex;
   align-items: center;
@@ -226,7 +241,7 @@ nav small {
 }
 .gift-image > span:not(.badge) {
   font-size: 65px;
-  color: var(--purple);
+  color: var(--blue);
 }
 .gift-image img,
 .list-card > img {
@@ -238,7 +253,7 @@ nav small {
   position: absolute;
   bottom: 12px;
   left: 12px;
-  background: var(--cream);
+  background: var(--canvas);
   border-radius: 20px;
   font-size: 12px;
   padding: 7px 11px;
@@ -305,13 +320,13 @@ nav small {
   margin-top: 32px;
 }
 .reservation-flip {
-  border-top: 1px dashed #c8bdc7;
+  border-top: 1px dashed #b8c4e0;
   margin-top: 15px;
   padding-top: 12px;
   transition: transform 0.3s;
 }
 .reservation-flip.revealed {
-  background: #e8def8;
+  background: #e9eeff;
   border-radius: 12px;
   padding: 10px;
   animation: flip 0.35s ease;
@@ -333,8 +348,8 @@ nav small {
 .cover-placeholder {
   display: grid;
   place-items: center;
-  background: #f6dce0;
-  color: var(--purple);
+  background: #eef2ff;
+  color: var(--blue);
   font-size: 70px;
 }
 .list-card > .text-button,
@@ -350,7 +365,7 @@ nav small {
 }
 .person-card {
   padding: 24px;
-  background: #eee5fc;
+  background: #e9eeff;
 }
 .person-icon {
   display: grid;
@@ -366,7 +381,7 @@ nav small {
 }
 .filters {
   border: 1px solid var(--line);
-  background: #fffcf7;
+  background: #ffffff;
   border-radius: 20px;
   padding: 16px;
 }
@@ -391,8 +406,8 @@ nav small {
   padding: 9px 13px;
 }
 .chip.selected {
-  background: #ece3fc;
-  border-color: #9c7dd9;
+  background: #e9eeff;
+  border-color: #3155ff;
 }
 .empty {
   text-align: center;
@@ -401,12 +416,12 @@ nav small {
 }
 .empty > span {
   font-size: 60px;
-  color: var(--purple);
+  color: var(--blue);
 }
 .notice,
 .draft-banner {
   padding: 14px 18px;
-  background: #eee5fc;
+  background: #e9eeff;
   border-radius: 15px;
   line-height: 1.5;
 }
@@ -421,8 +436,8 @@ nav small {
   color: var(--ink);
   text-align: left;
   margin: 12px 0;
-  background: #ffdfac;
-  border: 1px solid #f2c980;
+  background: #f0f9cd;
+  border: 1px solid #d8f36a;
 }
 .draft-banner span {
   float: right;
@@ -464,7 +479,7 @@ select {
   display: block;
   font: inherit;
   color: var(--ink);
-  border: 1px solid #d5cbd7;
+  border: 1px solid #cbd3e5;
   border-radius: 12px;
   padding: 12px;
   background: white;
@@ -475,7 +490,7 @@ select {
 input[type="checkbox"] {
   width: 22px;
   min-height: 22px;
-  accent-color: var(--purple);
+  accent-color: var(--blue);
   margin: 0;
 }
 textarea {
@@ -522,10 +537,10 @@ dialog {
   width: min(650px, calc(100vw - 24px));
   max-height: 90dvh;
   color: var(--ink);
-  background: var(--cream);
+  background: var(--canvas);
 }
 dialog::backdrop {
-  background: #30223b70;
+  background: #17213b70;
   backdrop-filter: blur(4px);
 }
 dialog > header {
@@ -535,7 +550,7 @@ dialog > header {
   gap: 10px;
   position: sticky;
   top: -24px;
-  background: var(--cream);
+  background: var(--canvas);
   padding: 4px 0;
   z-index: 2;
 }
@@ -567,7 +582,7 @@ dialog > header h2 {
   opacity: 0;
 }
 .file-button:focus-within {
-  outline: 3px solid var(--purple);
+  outline: 3px solid var(--blue);
 }
 .photo-grid {
   display: grid;
@@ -596,7 +611,7 @@ dialog > header h2 {
 }
 .guest-heading {
   border-radius: 28px;
-  background: var(--pink);
+  background: var(--lime-soft);
   padding: 35px;
   margin-bottom: 25px;
 }
@@ -621,8 +636,12 @@ dialog > header h2 {
     height: 72px;
     padding: 0 20px;
   }
-  .brand {
-    font-size: 24px;
+  .brand-mark {
+    width: 48px;
+    height: 48px;
+  }
+  .brand-wordmark {
+    font-size: 23px;
   }
   .shell {
     display: block;
@@ -717,9 +736,6 @@ dialog > header h2 {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.brand span {
-  font-variant-emoji: text;
-}
 @media (max-width: 450px) {
   .topbar > small {
     display: none;
@@ -745,7 +761,7 @@ dialog > header h2 {
 }
 .list-card .card-open:focus-visible::after,
 .gift-card .card-open:focus-visible::after {
-  outline: 3px solid var(--purple);
+  outline: 3px solid var(--blue);
   outline-offset: 3px;
 }
 .list-card .row,
@@ -767,9 +783,9 @@ dialog > header h2 {
 }
 .list-tag {
   display: inline-block;
-  background: #eee3ff;
-  color: #593c85;
-  border: 1px solid #bba1dd;
+  background: #e9eeff;
+  color: #2343d2;
+  border: 1px solid #b8c7ff;
   border-radius: 14px;
   padding: 4px 8px;
   font-size: 12px;
@@ -785,7 +801,7 @@ dialog > header h2 {
 .metadata-preview figure {
   margin: 12px 0;
   padding: 12px;
-  background: #f5eeff;
+  background: #eef2ff;
   border-radius: 16px;
 }
 .metadata-preview img {
@@ -861,7 +877,7 @@ dialog > header h2 {
 }
 .gift-card:has(.card-open:focus-visible),
 .list-card:has(.card-open:focus-visible) {
-  outline: 3px solid var(--purple);
+  outline: 3px solid var(--blue);
   outline-offset: 3px;
 }
 /* Capture: keep extraction feedback beside its action on every screen. */
@@ -902,7 +918,7 @@ dialog > header h2 {
   align-items: center;
   gap: 15px;
   padding: 14px;
-  background: #f5eeff;
+  background: #eef2ff;
   border-radius: 15px;
 }
 .draft-summary img {
@@ -980,7 +996,7 @@ dialog > header h2 {
   border: 1px solid var(--line);
 }
 .color-swatches button[aria-pressed="true"] {
-  outline: 2px solid var(--purple);
+  outline: 2px solid var(--blue);
 }
 .color-swatches span {
   width: 24px;
@@ -995,7 +1011,7 @@ dialog > header h2 {
   cursor: pointer;
 }
 button[data-recipient][aria-pressed="true"] {
-  outline: 3px solid var(--purple);
+  outline: 3px solid var(--blue);
   outline-offset: 2px;
 }
 button[data-recipient]:hover {
@@ -1044,6 +1060,80 @@ button[data-recipient] {
   cursor: grab;
 }
 
-.privacy-page { max-width: 860px; line-height: 1.65; }
-.privacy-page h2 { margin-top: 2rem; }
-.privacy-page a:not(.brand) { text-decoration: underline; text-underline-offset: 3px; }
+.privacy-page {
+  max-width: 860px;
+  line-height: 1.65;
+}
+.privacy-page h2 {
+  margin-top: 2rem;
+}
+.privacy-page a:not(.brand) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Bleu surprise — La Hotte Humbert. */
+.topbar {
+  background: #fff;
+}
+nav button.active {
+  background: var(--lime);
+  font-weight: 800;
+}
+nav small {
+  color: var(--ink);
+}
+button,
+.file-button {
+  border-radius: 16px;
+}
+.add-sticky {
+  border-radius: 999px;
+  box-shadow: 0 8px 24px #3155ff33;
+}
+.gift-card,
+.list-card,
+.person-card {
+  box-shadow: 0 4px 16px #17213b06;
+}
+.gift-card.private {
+  border-color: var(--blue);
+}
+.gift-essential {
+  background: #f3f6ff;
+}
+.gift-image .placeholder-mark {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+}
+.cover-placeholder .placeholder-mark {
+  width: 80px;
+  height: 80px;
+}
+.guest-heading {
+  background: #eef2ff;
+  border: 1px solid var(--line);
+}
+.guest-heading .brand {
+  margin-bottom: 14px;
+}
+.privacy-page {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 360px) {
+  .topbar {
+    padding-inline: 12px;
+  }
+  .brand {
+    gap: 8px;
+  }
+  .brand-wordmark {
+    font-size: 21px;
+  }
+}
+.empty .placeholder-mark {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}

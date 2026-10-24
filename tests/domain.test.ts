@@ -215,6 +215,6 @@ describe("Couleurs des personnes", () => {
     ).toEqual({ a: "#ffeecc" });
     expect(recipientStyle("#000000").color).toBe("#ffffff");
     expect(recipientStyle("#ffffff").color).toBe("#000000");
-    expect(recipientStyle("invalid").backgroundColor).toBe("#eee5fc");
+    expect(recipientStyle("invalid").backgroundColor).toBe("#e9eeff");
   });
 });

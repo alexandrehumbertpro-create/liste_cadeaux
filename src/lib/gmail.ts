@@ -17,6 +17,7 @@ export function gmailConfigured() {
 function key() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY)
     throw Error("Service non configuré");
+  // Stable cryptographic context: renaming the app must not invalidate Gmail connections.
   return createHash("sha256")
     .update("KadHumbert Gmail v1\0" + process.env.SUPABASE_SERVICE_ROLE_KEY)
     .digest();

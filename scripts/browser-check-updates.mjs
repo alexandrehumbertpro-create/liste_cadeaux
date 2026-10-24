@@ -134,7 +134,7 @@ const origin = process.env.TEST_APP_URL || "http://localhost:3000";
     });
     await preview.waitFor();
     assert.match(await preview.getAttribute("href"), /^\/l\//);
-    await p.getByRole("button", { name: "Kad’Humbert" }).click();
+    await p.getByRole("button", { name: "La Hotte Humbert" }).click();
     await p.getByRole("heading", { name: "Pour qui", exact: true }).waitFor();
     assert.equal(
       await p.evaluate(() => document.documentElement.scrollWidth > innerWidth),

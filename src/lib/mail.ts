@@ -9,6 +9,9 @@ const escape = (s: unknown) =>
         c
       ]!,
   );
+function brandedEmail(content: string) {
+  return `<!doctype html><html lang="fr"><body style="margin:0;background:#f7f9ff;color:#17213B;font-family:Arial,sans-serif"><div style="max-width:600px;margin:24px auto;padding:28px;background:#ffffff;border:1px solid #e3e8f2;border-radius:24px"><p style="margin:0 0 24px;font-size:26px;font-weight:800;line-height:1.1">La Hotte<br><span style="color:#3155FF">Humbert</span></p><div style="height:5px;width:56px;background:#D8F36A;margin-bottom:24px"></div>${content}<p style="margin-top:28px;color:#5c657a;font-size:13px">Pour les âmes en panne d’inspiration</p></div></body></html>`;
+}
 // The automatic sender is deliberately Alex, never whichever administrator
 // happens to be logged in or the first connected mailbox.
 export async function transactionalSenderId() {
@@ -149,7 +152,9 @@ export async function drainEmails() {
           /^https?:\/\//.test(idea.image_url)
         )
           illustration = `<img src="${escape(idea.image_url)}" width="400" alt="Illustration du cadeau">`;
-        const html = `<h1>Kad’Humbert</h1><h2>${escape(idea.title)}</h2>${illustration}${people ? `<p>Pour : ${escape(people)}</p>` : ""}<p>${escape(price)} · ${escape(priority)}</p><p>${escape(idea.description)}</p><p>${escape(idea.specifications)}</p>${product}${link}<p>Pour les âmes en panne d’inspiration</p>`;
+        const html = brandedEmail(
+          `<h2>${escape(idea.title)}</h2>${illustration}${people ? `<p>Pour : ${escape(people)}</p>` : ""}<p>${escape(price)} · ${escape(priority)}</p><p>${escape(idea.description)}</p><p>${escape(idea.specifications)}</p>${product}${link}`,
+        );
         await sendGmail(
           job.payload.senderProfileId,
           job.email,
@@ -191,7 +196,9 @@ export async function drainEmails() {
       job.kind === "reserved"
         ? `<p>Pour : ${escape(job.payload.recipient)}</p><p>${escape(job.payload.specifications)}</p><p>Budget : ${escape(job.payload.priceMin ?? "non renseigné")}${job.payload.priceMax !== null && job.payload.priceMax !== undefined ? "–" + escape(job.payload.priceMax) : ""} €</p>${job.payload.amount !== null && job.payload.amount !== undefined ? `<p>Participation : ${escape(job.payload.amount)} € (sans paiement)</p>` : ""}${typeof job.payload.url === "string" && /^https?:\/\//.test(job.payload.url) ? `<p><a href="${escape(job.payload.url)}">Voir le produit</a></p>` : ""}`
         : "";
-    const html = `<h1>Kad’Humbert</h1><p>${escape(subjects[job.kind] || "Votre réservation")} : ${title}</p>${job.kind === "admin_reserved" ? "<p>Le nom du réservant reste masqué. Consultez votre carnet pour en savoir plus.</p>" : `<p><a href="${escape(url)}">Consulter ou annuler ma réservation</a></p>`}${recap}<p>Pour les âmes en panne d’inspiration</p>`;
+    const html = brandedEmail(
+      `<p>${escape(subjects[job.kind] || "Votre réservation")} : ${title}</p>${job.kind === "admin_reserved" ? "<p>Le nom du réservant reste masqué. Consultez votre carnet pour en savoir plus.</p>" : `<p><a href="${escape(url)}">Consulter ou annuler ma réservation</a></p>`}${recap}`,
+    );
     try {
       if (!automaticSender)
         throw Error(
@@ -200,7 +207,7 @@ export async function drainEmails() {
       await sendGmail(
         automaticSender,
         job.email,
-        subjects[job.kind] || "Kad’Humbert",
+        subjects[job.kind] || "La Hotte Humbert",
         html,
       );
       await db

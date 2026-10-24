@@ -1,4 +1,5 @@
 "use client";
+import Brand from "@/components/Brand";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cancelReservation } from "@/lib/client-actions";
@@ -20,7 +21,9 @@ export default function Reservation({
     [busy, setBusy] = useState(false);
   return (
     <main className="setup">
-      <p className="brand">Kad’Humbert ✳</p>
+      <p className="brand">
+        <Brand />
+      </p>
       <h1>Votre réservation</h1>
       <h2>{info.title}</h2>
       <p>Au nom de {info.name}</p>

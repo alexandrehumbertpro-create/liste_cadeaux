@@ -57,7 +57,7 @@ try {
     await page.getByRole("heading", { name: listName, exact: true }).waitFor();
   });
   await check("Brouillon conservé puis repris sans perte", async () => {
-    await page.getByRole("button", { name: "Kad’Humbert" }).click();
+    await page.getByRole("button", { name: "La Hotte Humbert" }).click();
     await page
       .getByRole("button", { name: "+ Idée", exact: true })
       .last()

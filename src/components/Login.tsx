@@ -1,4 +1,5 @@
 "use client";
+import Brand from "@/components/Brand";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/client-actions";
@@ -9,7 +10,7 @@ export default function Login({ destination = "/" }: { destination?: string }) {
   return (
     <main className="setup">
       <a className="brand" href="/">
-        Kad’Humbert <span>✳</span>
+        <Brand />
       </a>
       <p>Pour les âmes en panne d’inspiration</p>
       <h1>Votre carnet à deux</h1>

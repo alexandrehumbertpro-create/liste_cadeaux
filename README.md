@@ -1,4 +1,4 @@
-# Kad’Humbert
+# La Hotte Humbert
 
 Pour les âmes en panne d’inspiration.
 

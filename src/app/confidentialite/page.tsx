@@ -1,22 +1,23 @@
+import Brand from "@/components/Brand";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Confidentialité — Kad’Humbert / Appli cadeaux",
+  title: "Confidentialité — La Hotte Humbert / Appli cadeaux",
   description:
-    "Données personnelles et connexion Gmail de Kad’Humbert, également nommé Appli cadeaux dans Google.",
+    "Données personnelles et connexion Gmail de La Hotte Humbert, également nommé Appli cadeaux dans Google.",
 };
 
 export default function PrivacyPage() {
   return (
     <main className="setup privacy-page">
       <a className="brand" href="/">
-        Kad’Humbert <span>✳</span>
+        <Brand />
       </a>
       <h1>Confidentialité</h1>
       <p>Dernière mise à jour : 24 octobre 2026.</p>
       <p>
-        Kad’Humbert, nommé « Appli cadeaux » sur l’écran de connexion Google,
-        est un carnet familial d’idées cadeaux géré par Alex et Elise.
+        La Hotte Humbert, nommé « Appli cadeaux » sur l’écran de connexion
+        Google, est un carnet familial d’idées cadeaux géré par Alex et Elise.
       </p>
       <h2>Les données utilisées</h2>
       <p>
@@ -37,7 +38,7 @@ export default function PrivacyPage() {
         d’identifier leur adresse email et d’envoyer des messages avec leur
         autorisation. L’application demande l’accès à l’identité du compte et
         l’autorisation Gmail d’envoi, sans accès à la lecture de la boîte de
-        réception. Aucun mot de passe Gmail n’est demandé par Kad’Humbert.
+        réception. Aucun mot de passe Gmail n’est demandé par La Hotte Humbert.
       </p>
       <p>
         Les partages rapides et alertes d’ajout partent du Gmail de
@@ -104,7 +105,7 @@ export default function PrivacyPage() {
         conserver une session ouverte sur un appareil partagé.
       </p>
       <p>
-        <a href="/">Revenir à Kad’Humbert</a>
+        <a href="/">Revenir à La Hotte Humbert</a>
       </p>
     </main>
   );

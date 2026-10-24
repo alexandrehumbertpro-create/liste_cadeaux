@@ -46,7 +46,7 @@ async function get(
       {
         family: address.family,
         headers: {
-          "User-Agent": "KadHumbert/1.0 (gift-list metadata)",
+          "User-Agent": "LaHotteHumbert/1.0 (gift-list metadata)",
           Accept: "text/html,application/xhtml+xml",
           "Accept-Encoding": "identity",
           "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",

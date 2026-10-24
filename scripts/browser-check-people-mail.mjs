@@ -148,7 +148,7 @@ try {
     1,
   );
   await d.getByRole("button", { name: "Fermer", exact: true }).click();
-  await p.getByRole("button", { name: "Kad’Humbert" }).click();
+  await p.getByRole("button", { name: "La Hotte Humbert" }).click();
   await p
     .getByRole("button", { name: "Modifier " + renamed, exact: true })
     .click();
@@ -202,7 +202,7 @@ try {
     },
   ]);
   await sql.query("commit");
-  await p.getByRole("button", { name: "Kad’Humbert" }).click();
+  await p.getByRole("button", { name: "La Hotte Humbert" }).click();
   await p.getByRole("button", { name: "Modifier " + b, exact: true }).click();
   d = p.getByRole("dialog");
   await d.getByRole("button", { name: "Supprimer cette personne" }).click();

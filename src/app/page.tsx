@@ -14,7 +14,7 @@ export default async function Home({
   if (!configured())
     return (
       <main className="setup">
-        <h1>Kad’Humbert ✨</h1>
+        <h1>La Hotte Humbert ✨</h1>
         <p>Pour les âmes en panne d’inspiration</p>
         <h2>Votre carnet prend forme</h2>
         <p>

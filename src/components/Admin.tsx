@@ -1,4 +1,5 @@
 "use client";
+import Brand from "@/components/Brand";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Dataset, Proposal, GiftList } from "@/lib/types";
@@ -60,7 +61,7 @@ export default function Admin({
     [archivePersonIdeas, setArchivePersonIdeas] = useState(false),
     [shareProposal, setShareProposal] = useState<Proposal | null>(null),
     [colorPerson, setColorPerson] = useState(""),
-    [personColor, setPersonColor] = useState("#eee5fc");
+    [personColor, setPersonColor] = useState("#e9eeff");
   const draftKey = "kad-draft-" + data.profile.id;
   const checkDraft = useCallback(() => {
     try {
@@ -355,7 +356,7 @@ export default function Admin({
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = "kad-humbert-carnet.json";
+    a.download = "la-hotte-humbert-carnet.json";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -369,7 +370,7 @@ export default function Admin({
     <>
       <header className="topbar">
         <button className="brand" onClick={() => navigate("people")}>
-          Kad’Humbert <span>✳</span>
+          <Brand />
         </button>
         <button
           className="avatar"
@@ -470,7 +471,7 @@ export default function Admin({
             {view === "people" && !person && (
               <button
                 onClick={() => {
-                  setPersonColor("#eee5fc");
+                  setPersonColor("#e9eeff");
                   setNotice("");
                   setModal("person");
                 }}
@@ -619,7 +620,13 @@ export default function Admin({
                         {previews[l.id] ? (
                           <img src={previews[l.id]} alt="" />
                         ) : (
-                          <div className="cover-placeholder">✳</div>
+                          <div className="cover-placeholder">
+                            <img
+                              className="placeholder-mark"
+                              src="/brand-mark.svg"
+                              alt=""
+                            />
+                          </div>
                         )}
                         <button
                           className="text-button card-open"
@@ -744,7 +751,7 @@ export default function Admin({
                           onClick={() => {
                             setNotice("");
                             setColorPerson(r.id);
-                            setPersonColor(colors[r.id] || "#eee5fc");
+                            setPersonColor(colors[r.id] || "#e9eeff");
                             setModal("personColor");
                           }}
                         >
@@ -991,7 +998,11 @@ export default function Admin({
               </div>
               {!proposals.length && (
                 <div className="empty">
-                  <span>✳</span>
+                  <img
+                    className="placeholder-mark"
+                    src="/brand-mark.svg"
+                    alt=""
+                  />
                   <h2>Une place pour la prochaine bonne idée</h2>
                   <p>
                     {query || activeFilters.length
@@ -1037,7 +1048,11 @@ export default function Admin({
                               {previews[i.id] ? (
                                 <img src={previews[i.id]} alt="" />
                               ) : (
-                                <span>✳</span>
+                                <img
+                                  className="placeholder-mark"
+                                  src="/brand-mark.svg"
+                                  alt=""
+                                />
                               )}
                               <label className="selection">
                                 <input
@@ -1619,7 +1634,7 @@ export default function Admin({
                 setNotice(r.error);
                 return;
               }
-              const message = `Bonjour ${name}, je t’invite à voir la liste « ${currentList.name} » sur Kad’Humbert ✨ ${shareLink(currentList)}`;
+              const message = `Bonjour ${name}, je t’invite à voir la liste « ${currentList.name} » sur La Hotte Humbert ✨ ${shareLink(currentList)}`;
               const url =
                 channel === "whatsapp"
                   ? "https://wa.me/?text=" + encodeURIComponent(message)
