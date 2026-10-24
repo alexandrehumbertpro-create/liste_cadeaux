@@ -79,6 +79,126 @@ try {
   const recipient = (
     await db.query("select id from recipients where name='Alex'")
   ).rows[0].id;
+  // Simulate existing personal choices before migrating to shared colours.
+  await db.query(
+    "update profiles set preferences=jsonb_build_object('recipientColors',jsonb_build_object($1::text,$2::text)) where id=$3",
+    [recipient, "#123456", alex],
+  );
+  await db.query(
+    "update profiles set preferences=jsonb_build_object('recipientColors',jsonb_build_object($1::text,$2::text,(select id::text from recipients where name='Elise'),'#d8f36a')) where id=$3",
+    [recipient, "#abcdef", elise],
+  );
+  await db.query(
+    await readFile(
+      new URL(
+        "../supabase/migrations/202610240002_shared_recipient_colors.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await check(
+    "La migration partage les couleurs existantes en privilégiant Alex puis Elise",
+    async () => {
+      assert.equal(
+        (
+          await db.query("select color from recipients where id=$1", [
+            recipient,
+          ])
+        ).rows[0].color,
+        "#123456",
+      );
+      assert.equal(
+        (await db.query("select color from recipients where name='Elise'"))
+          .rows[0].color,
+        "#d8f36a",
+      );
+    },
+  );
+  await check(
+    "Une couleur changée par Alex est visible par Elise et réciproquement",
+    async () => {
+      await admin(alex, "select set_recipient_color($1,'#3155FF')", [
+        recipient,
+      ]);
+      assert.equal(
+        (
+          await admin(elise, "select color from recipients where id=$1", [
+            recipient,
+          ])
+        ).rows[0].color,
+        "#3155ff",
+      );
+      await admin(elise, "select set_recipient_color($1,'#d8f36a')", [
+        recipient,
+      ]);
+      assert.equal(
+        (
+          await admin(alex, "select color from recipients where id=$1", [
+            recipient,
+          ])
+        ).rows[0].color,
+        "#d8f36a",
+      );
+    },
+  );
+  await check(
+    "Commun E&A accepte une couleur mais reste protégé contre le renommage",
+    async () => {
+      const id = (await db.query("select id from recipients where is_common"))
+        .rows[0].id;
+      await admin(elise, "select set_recipient_color($1,'#3155ff')", [id]);
+      await assert.rejects(
+        admin(alex, "select rename_recipient($1,'Autre')", [id]),
+        /common_is_protected/,
+      );
+      await assert.rejects(
+        admin(alex, "update recipients set deleted_at=now() where id=$1", [id]),
+        /common_is_protected/,
+      );
+    },
+  );
+  await check(
+    "Les couleurs invalides et les visiteurs sont refusés ; création avec couleur atomique",
+    async () => {
+      await assert.rejects(
+        admin(alex, "select set_recipient_color($1,'red')", [recipient]),
+        /invalid_color/,
+      );
+      await assert.rejects(
+        admin(outsider, "select set_recipient_color($1,'#ffffff')", [
+          recipient,
+        ]),
+        /not_authorized/,
+      );
+      await assert.rejects(
+        admin(
+          alex,
+          "select add_recipient_with_color('Couleur invalide','invalid')",
+        ),
+        /invalid_color/,
+      );
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from recipients where name='Couleur invalide'",
+          )
+        ).rows[0].n,
+        0,
+      );
+      const id = (
+        await admin(
+          elise,
+          "select add_recipient_with_color('Couleur commune','#aabbcc') id",
+        )
+      ).rows[0].id;
+      assert.equal(
+        (await admin(alex, "select color from recipients where id=$1", [id]))
+          .rows[0].color,
+        "#aabbcc",
+      );
+    },
+  );
   const list = (
     await admin(
       alex,

@@ -175,6 +175,16 @@ await sql.query(
     "utf8",
   ),
 );
+await sql.query(
+  await readFile(
+    new URL(
+      "../supabase/migrations/202610240002_shared_recipient_colors.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+
 await sql.end();
 await writeFile(
   "/tmp/kad-integration-credentials.json",

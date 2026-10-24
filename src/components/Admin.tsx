@@ -11,6 +11,8 @@ import GiftForm from "./GiftForm";
 import ImageInput from "./ImageInput";
 import QuickShare from "./QuickShare";
 import ColorPicker from "./ColorPicker";
+import { personalOrder } from "@/lib/personal-order";
+import { browserClient } from "@/lib/supabase/browser";
 import { recipientColors, recipientStyle } from "@/lib/recipient-colors";
 const priorities = ["♥ Coup de cœur", "★ Idée prioritaire", "Idée"];
 const reasons: Record<string, string> = {
@@ -166,6 +168,23 @@ export default function Admin({
     const interval = setInterval(() => router.refresh(), 60000);
     return () => clearInterval(interval);
   }, [router]);
+  useEffect(() => {
+    const db = browserClient();
+    const channel = db
+      .channel("shared-recipients")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "recipients" },
+        () => router.refresh(),
+      )
+      .subscribe();
+    const onFocus = () => router.refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      void db.removeChannel(channel);
+    };
+  }, [router]);
   function refresh() {
     router.refresh();
   }
@@ -223,7 +242,7 @@ export default function Admin({
     }
   }
   const prefs = data.profile.preferences;
-  const colors = recipientColors(prefs);
+  const colors = recipientColors(data.recipients);
   const favorites = Array.isArray(prefs.favorites)
     ? (prefs.favorites as string[])
     : [];
@@ -232,12 +251,7 @@ export default function Admin({
     (Array.isArray(prefs.order) ? (prefs.order as string[]) : []);
   useEffect(() => setManualOrder(null), [prefs.order]);
   const sorted = <T extends { id: string }>(rows: T[]) =>
-    [...rows].sort(
-      (a, b) =>
-        Number(favorites.includes(b.id)) - Number(favorites.includes(a.id)) ||
-        (order.indexOf(a.id) < 0 ? 999 : order.indexOf(a.id)) -
-          (order.indexOf(b.id) < 0 ? 999 : order.indexOf(b.id)),
-    );
+    personalOrder(rows, prefs, manualOrder, view === "lists");
   function favorite(id: string) {
     run(
       () =>
@@ -256,7 +270,8 @@ export default function Admin({
       !busy &&
       at >= 0 &&
       at < ids.length &&
-      favorites.includes(id) === favorites.includes(ids[at])
+      (view !== "lists" ||
+        favorites.includes(id) === favorites.includes(ids[at]))
     );
   }
   function saveOrder(arr: string[], ids: string[]) {
@@ -281,7 +296,7 @@ export default function Admin({
       busy ||
       id === target ||
       !ids.includes(id) ||
-      favorites.includes(id) !== favorites.includes(target)
+      !ids.includes(target)
     )
       return;
     const arr = ids.filter((x) => x !== id);
@@ -587,9 +602,9 @@ export default function Admin({
               </div>
               {organize && (
                 <p className="notice">
-                  Utilisez les flèches pour déplacer les fiches, ou glissez-les
-                  sur ordinateur. Les favoris restent en tête : chaque groupe
-                  conserve son propre ordre.
+                  {view === "lists"
+                    ? "Utilisez les flèches pour déplacer les listes. Les listes favorites restent en tête."
+                    : "Utilisez les flèches pour déplacer les fiches, ou glissez-les sur ordinateur. Cet ordre est repris dans le formulaire d’ajout d’idée."}
                 </p>
               )}
               <div className="grid">
@@ -737,13 +752,6 @@ export default function Admin({
                             }{" "}
                             idées
                           </p>
-                        </button>
-                        <button
-                          className="secondary"
-                          aria-label={"Favori " + r.name}
-                          onClick={() => favorite(r.id)}
-                        >
-                          {favorites.includes(r.id) ? "★" : "☆"}
                         </button>
                         <button
                           className="secondary color-edit"
@@ -1339,7 +1347,10 @@ export default function Admin({
           }}
         >
           <GiftForm
-            data={data}
+            data={{
+              ...data,
+              profile: { ...data.profile, preferences: { ...prefs, order } },
+            }}
             idea={
               form === "new"
                 ? undefined
@@ -1537,22 +1548,23 @@ export default function Admin({
               e.preventDefault();
               setBusy(true);
               try {
-                const result = await actions.updatePreferences({
-                  ...prefs,
-                  recipientColors: { ...colors, [colorPerson]: personColor },
-                });
+                const result = await actions.updateRecipientColor(
+                  colorPerson,
+                  personColor,
+                );
                 if (!result.ok) {
                   setNotice(result.error);
                   return;
                 }
                 setModal("");
                 refresh();
-                setNotice("Couleur enregistrée");
+                setNotice("Couleur enregistrée pour vous deux");
               } finally {
                 setBusy(false);
               }
             }}
           >
+            <p>Cette couleur est commune à Alexandre et Elise.</p>
             <ColorPicker value={personColor} change={setPersonColor} />
             <button disabled={busy}>Enregistrer la couleur</button>
           </form>
@@ -1568,20 +1580,14 @@ export default function Admin({
             onSubmit={async (e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
-              const r = await actions.createRecipient(String(f.get("name")));
+              const r = await actions.createRecipient(
+                String(f.get("name")),
+                personColor,
+              );
               if (!r.ok) {
                 setNotice(r.error);
                 return;
               }
-              const saved = await actions.updatePreferences({
-                ...prefs,
-                recipientColors: { ...colors, [r.data!.id]: personColor },
-              });
-              if (!saved.ok)
-                setNotice(
-                  "Personne créée. La couleur n’a pas pu être enregistrée : " +
-                    saved.error,
-                );
               done();
             }}
           >

@@ -93,7 +93,7 @@ Le bouton de récupération affiche les champs trouvés et l’aperçu image. L�
 
 Les photos sont préparées dans le navigateur (JPEG, bord maximal 2048 px, envoi inférieur à 2 Mo) pour rester sous les limites de requête de l’hébergement. Les fichiers HEIC sont convertis à la demande. Les liens directs d’images http/https sont utilisables pour les idées et les couvertures, avec aperçu.
 
-Dans Pour qui, Couleur personnalise chaque carte. La même couleur est reprise dans la sélection des personnes lors de l’ajout d’une idée. Cette personnalisation, comme les favoris, appartient au compte connecté et est conservée dans ses préférences Supabase. Les personnes peuvent aussi être créées avec leur couleur directement dans le formulaire d’idée.
+Dans Pour qui, Couleur personnalise chaque carte. La même couleur est reprise dans la sélection des personnes lors de l’ajout d’une idée. La couleur est partagée entre Alexandre et Elise et conservée sur le destinataire dans Supabase. Les changements sont reçus en direct, avec actualisation au retour dans l’onglet et périodique en secours. Les personnes peuvent aussi être créées avec leur couleur directement dans le formulaire d’idée.
 
 Vérifications locales supplémentaires : `node scripts/browser-check-capture.mjs`, `node scripts/browser-check-colors.mjs`, `HEIC_TEST_FILE=/chemin/fixture.heic node scripts/test-photo-preparation.mjs`. Les deux premiers scripts exigent la pile d’intégration jetable et ses comptes de test ; TEST_APP_URL doit être une adresse locale. Le troisième exige Chromium et une fixture HEIC locale.
 
@@ -101,7 +101,7 @@ Vérifications locales supplémentaires : `node scripts/browser-check-capture.mj
 
 Avant de déployer cette version sur un projet existant, appliquer `supabase/migrations/202610240001_people_and_gmail.sql`. Pour un projet neuf, appliquer toutes les migrations dans l’ordre.
 
-- « Modifier l’ordre » affiche des commandes de déplacement et autorise le glisser-déposer sur ordinateur. Les favoris restent en tête ; chaque groupe garde son ordre personnel. Les flèches sont désactivées à la frontière des groupes.
+- « Modifier l’ordre » affiche des commandes de déplacement et autorise le glisser-déposer sur ordinateur. Les personnes n’ont plus de favoris : seul leur ordre personnel compte, et le formulaire d’idée reprend exactement le même ordre. Les favoris des listes restent disponibles.
 - Une personne peut être renommée ou supprimée. La suppression propose de garder ses cadeaux dans À classer ou de retirer ses cadeaux actifs en les conservant aux archives. Les associations aux listes sont conservées, mais les cadeaux sans personne active disparaissent de la vue invitée. Les réservations concernées sont annulées. Les idées privées de l’autre administrateur ne sont pas modifiées ; si leur personne a été supprimée, elles apparaissent comme non classées chez leur propriétaire. Les anciens destinataires restent consultables dans les archives. Recréer un nom supprimé réactive sa fiche.
 - « Commun E&A » est protégé contre le renommage, la suppression et le changement du statut commun.
 - Le prix et la priorité sont accessibles directement dans le formulaire. Les précisions restent dépliables.
@@ -111,3 +111,7 @@ Avant de déployer cette version sur un projet existant, appliquer `supabase/mig
 Pour activer l’envoi réel, suivre [GMAIL_SETUP.md](GMAIL_SETUP.md). La configuration Google et l’autorisation de chaque administrateur sont nécessaires ; les messages restent en attente tant qu’elles ne sont pas terminées. La connexion OAuth n’a pas été réalisée avec un compte réel pendant le développement.
 
 Vérification locale supplémentaire : `TEST_APP_URL=http://localhost:3000 node scripts/browser-check-people-mail.mjs`, sur la pile d’intégration jetable uniquement.
+
+### Migration des couleurs partagées
+
+Sur un projet existant, exécuter `supabase/migrations/202610240002_shared_recipient_colors.sql` avant de déployer ce changement. Les couleurs précédentes d’Alex sont reprises en priorité ; si Alex n’en avait pas choisi, celles d’Elise sont conservées. Les autres préférences restent personnelles.

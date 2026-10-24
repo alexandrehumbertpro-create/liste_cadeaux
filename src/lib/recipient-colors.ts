@@ -8,16 +8,16 @@ export const recipientPalette = [
   { name: "Bleu", value: "#dceafb" },
   { name: "Jaune", value: "#fff0b3" },
 ];
+// Colours belong to recipients and are shared by all administrators.
 export function recipientColors(
-  preferences: Record<string, unknown>,
+  recipients: { id: string; color?: string }[],
 ): Record<string, string> {
-  const raw = preferences.recipientColors;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   return Object.fromEntries(
-    Object.entries(raw).filter(
-      (entry): entry is [string, string] =>
-        typeof entry[1] === "string" && /^#[0-9a-f]{6}$/i.test(entry[1]),
-    ),
+    recipients
+      .filter(
+        (r) => typeof r.color === "string" && /^#[0-9a-f]{6}$/i.test(r.color),
+      )
+      .map((r) => [r.id, r.color!]),
   );
 }
 export function recipientStyle(color = "#e9eeff") {

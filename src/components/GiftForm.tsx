@@ -3,14 +3,10 @@ import { useState, useEffect, useRef, useId } from "react";
 import { useRouter } from "next/navigation";
 import type { Dataset, Idea, Proposal } from "@/lib/types";
 import type { GiftInput } from "@/lib/validation";
-import {
-  saveGift,
-  createRecipient,
-  saveList,
-  updatePreferences,
-} from "@/lib/client-actions";
+import { saveGift, createRecipient, saveList } from "@/lib/client-actions";
 import ImageInput from "./ImageInput";
 import ColorPicker from "./ColorPicker";
+import { personalOrder } from "@/lib/personal-order";
 import { recipientColors, recipientStyle } from "@/lib/recipient-colors";
 const initial: GiftInput = {
   title: "",
@@ -54,7 +50,7 @@ export default function GiftForm({
 }) {
   const router = useRouter();
   const linkId = useId();
-  const colors = recipientColors(data.profile.preferences);
+  const colors = recipientColors(data.recipients);
   const [v, set] = useState<GiftInput>(
     () =>
       draft ??
@@ -403,48 +399,49 @@ export default function GiftForm({
       <fieldset>
         <legend>Pour qui ?</legend>
         <div className="chips">
-          {data.recipients
-            .filter((p) => !p.deleted_at)
-            .map((p) => (
-              <button
-                type="button"
-                className={
-                  "chip " + (v.candidates.includes(p.id) ? "selected" : "")
-                }
-                key={p.id}
-                style={recipientStyle(colors[p.id])}
-                aria-pressed={v.candidates.includes(p.id)}
-                data-recipient={p.id}
-                onClick={() => {
-                  const ids = v.candidates.includes(p.id)
-                    ? v.candidates.filter((id) => id !== p.id)
-                    : p.is_common
-                      ? [p.id]
-                      : [
-                          ...v.candidates.filter(
-                            (id) =>
-                              !data.recipients.find((r) => r.id === id)
-                                ?.is_common,
-                          ),
-                          p.id,
-                        ];
-                  set((old) => ({
-                    ...old,
-                    candidates: ids,
-                    recipientId: ids.includes(old.recipientId ?? "")
-                      ? old.recipientId
-                      : (ids[0] ?? null),
-                  }));
-                }}
-              >
-                {p.name}
-                {v.candidates.includes(p.id) ? (
-                  <span aria-hidden="true"> ✓</span>
-                ) : (
-                  ""
-                )}
-              </button>
-            ))}
+          {personalOrder(
+            data.recipients.filter((p) => !p.deleted_at),
+            data.profile.preferences,
+          ).map((p) => (
+            <button
+              type="button"
+              className={
+                "chip " + (v.candidates.includes(p.id) ? "selected" : "")
+              }
+              key={p.id}
+              style={recipientStyle(colors[p.id])}
+              aria-pressed={v.candidates.includes(p.id)}
+              data-recipient={p.id}
+              onClick={() => {
+                const ids = v.candidates.includes(p.id)
+                  ? v.candidates.filter((id) => id !== p.id)
+                  : p.is_common
+                    ? [p.id]
+                    : [
+                        ...v.candidates.filter(
+                          (id) =>
+                            !data.recipients.find((r) => r.id === id)
+                              ?.is_common,
+                        ),
+                        p.id,
+                      ];
+                set((old) => ({
+                  ...old,
+                  candidates: ids,
+                  recipientId: ids.includes(old.recipientId ?? "")
+                    ? old.recipientId
+                    : (ids[0] ?? null),
+                }));
+              }}
+            >
+              {p.name}
+              {v.candidates.includes(p.id) ? (
+                <span aria-hidden="true"> ✓</span>
+              ) : (
+                ""
+              )}
+            </button>
+          ))}
           <button
             type="button"
             className="chip"
@@ -479,20 +476,15 @@ export default function GiftForm({
                   setBusy(true);
                   setError("");
                   try {
-                    const result = await createRecipient(newPersonName.trim());
+                    const result = await createRecipient(
+                      newPersonName.trim(),
+                      newPersonColor,
+                    );
                     if (!result.ok) {
                       setError(result.error);
                       return;
                     }
                     const id = result.data!.id;
-                    const saved = await updatePreferences({
-                      ...data.profile.preferences,
-                      recipientColors: { ...colors, [id]: newPersonColor },
-                    });
-                    if (!saved.ok)
-                      setError(
-                        "Personne créée. La couleur n’a pas pu être enregistrée.",
-                      );
                     set((old) => {
                       const candidates = [
                         ...old.candidates.filter(

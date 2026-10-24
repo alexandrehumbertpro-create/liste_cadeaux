@@ -1,3 +1,4 @@
+import { personalOrder } from "../src/lib/personal-order";
 import { recipientColors, recipientStyle } from "../src/lib/recipient-colors";
 import { describe, it, expect } from "vitest";
 import {
@@ -209,12 +210,35 @@ describe("Liens d’illustration", () => {
 describe("Couleurs des personnes", () => {
   it("ne réutilise que les couleurs hexadécimales valides et garde un texte contrasté", () => {
     expect(
-      recipientColors({
-        recipientColors: { a: "#ffeecc", b: "url(https://example.test)" },
-      }),
+      recipientColors([
+        { id: "a", color: "#ffeecc" },
+        { id: "b", color: "url(https://example.test)" },
+        { id: "c" },
+      ]),
     ).toEqual({ a: "#ffeecc" });
     expect(recipientStyle("#000000").color).toBe("#ffffff");
     expect(recipientStyle("#ffffff").color).toBe("#000000");
     expect(recipientStyle("invalid").backgroundColor).toBe("#e9eeff");
+  });
+});
+
+describe("Ordre des destinataires", () => {
+  it("reprend l’ordre choisi sans donner priorité aux anciens favoris", () => {
+    const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    const prefs = { order: ["b", "a"], favorites: ["a"] };
+    expect(personalOrder(rows, prefs).map((r) => r.id)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
+    expect(
+      personalOrder(rows, prefs, ["c", "b", "a"]).map((r) => r.id),
+    ).toEqual(["c", "b", "a"]);
+    expect(rows.map((r) => r.id)).toEqual(["a", "b", "c"]);
+    expect(personalOrder(rows, prefs, null, true).map((r) => r.id)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
   });
 });

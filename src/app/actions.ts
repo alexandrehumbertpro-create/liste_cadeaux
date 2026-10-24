@@ -26,6 +26,7 @@ function message(error: unknown) {
     private_notification_forbidden:
       "Une idée privée ne peut pas être envoyée à l’autre administrateur.",
     recipient_not_found: "Personne introuvable.",
+    invalid_color: "Choisissez une couleur valide.",
     invalid_name: "Indiquez un nom valide.",
     gift_unavailable:
       "Ce cadeau vient d’être réservé ou n’est plus disponible.",
@@ -101,18 +102,46 @@ export async function saveGift(input: unknown): Promise<Result<string>> {
 }
 export async function createRecipient(
   name: string,
+  color = "#e9eeff",
 ): Promise<Result<{ id: string }>> {
   try {
     const { db } = await requireAdmin();
-    const { data: recipient, error } = await db.rpc("add_recipient", {
-      new_name: z.string().trim().min(1).max(100).parse(name),
-    });
+    const { data: recipient, error } = await db.rpc(
+      "add_recipient_with_color",
+      {
+        new_name: z.string().trim().min(1).max(100).parse(name),
+        new_color: z
+          .string()
+          .regex(/^#[0-9a-f]{6}$/i, "Choisissez une couleur valide.")
+          .parse(color),
+      },
+    );
     if (error)
       throw new Error(
         error.code === "23505" ? "Ce destinataire existe déjà." : error.message,
       );
     revalidatePath("/");
     return { ok: true, data: { id: recipient! } };
+  } catch (e) {
+    return { ok: false, error: message(e) };
+  }
+}
+export async function updateRecipientColor(
+  id: string,
+  color: string,
+): Promise<Result> {
+  try {
+    const { db } = await requireAdmin();
+    const { error } = await db.rpc("set_recipient_color", {
+      person: z.uuid().parse(id),
+      new_color: z
+        .string()
+        .regex(/^#[0-9a-f]{6}$/i, "Choisissez une couleur valide.")
+        .parse(color),
+    });
+    if (error) throw Error(error.message);
+    revalidatePath("/");
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: message(e) };
   }

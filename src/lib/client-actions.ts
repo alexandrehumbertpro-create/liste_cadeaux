@@ -16,6 +16,7 @@ function safe<Args extends unknown[], R extends { ok: boolean }>(
 export const login = safe(server.login),
   saveGift = safe(server.saveGift),
   createRecipient = safe(server.createRecipient),
+  updateRecipientColor = safe(server.updateRecipientColor),
   saveList = safe(server.saveList),
   archiveGift = safe(server.archiveGift),
   resetGift = safe(server.resetGift),

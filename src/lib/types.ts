@@ -35,6 +35,7 @@ export type Recipient = {
   id: string;
   name: string;
   is_common: boolean;
+  color?: string;
   deleted_at?: string | null;
 };
 export type GiftList = {
