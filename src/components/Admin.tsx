@@ -623,7 +623,7 @@ export default function Admin({
                           <div className="cover-placeholder">
                             <img
                               className="placeholder-mark"
-                              src="/brand-mark.svg"
+                              src="/brand-mark.svg?v=3"
                               alt=""
                             />
                           </div>
@@ -1000,7 +1000,7 @@ export default function Admin({
                 <div className="empty">
                   <img
                     className="placeholder-mark"
-                    src="/brand-mark.svg"
+                    src="/brand-mark.svg?v=3"
                     alt=""
                   />
                   <h2>Une place pour la prochaine bonne idée</h2>
@@ -1050,7 +1050,7 @@ export default function Admin({
                               ) : (
                                 <img
                                   className="placeholder-mark"
-                                  src="/brand-mark.svg"
+                                  src="/brand-mark.svg?v=3"
                                   alt=""
                                 />
                               )}

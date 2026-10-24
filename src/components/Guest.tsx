@@ -150,7 +150,7 @@ export default function Guest({
                             ) : (
                               <img
                                 className="placeholder-mark"
-                                src="/brand-mark.svg"
+                                src="/brand-mark.svg?v=3"
                                 alt=""
                               />
                             )}

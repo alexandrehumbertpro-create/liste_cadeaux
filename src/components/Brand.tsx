@@ -3,7 +3,7 @@ export default function Brand() {
     <>
       <img
         className="brand-mark"
-        src="/brand-mark.svg"
+        src="/brand-mark.svg?v=3"
         width="60"
         height="60"
         alt=""
