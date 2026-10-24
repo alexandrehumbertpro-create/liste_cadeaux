@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Dataset, Proposal, GiftList } from "@/lib/types";
 import type { GiftInput } from "@/lib/validation";
 import { budgetOverlap, formatPrice, inList } from "@/lib/validation";
@@ -8,6 +8,7 @@ import * as actions from "@/lib/client-actions";
 import Modal from "./Modal";
 import GiftForm from "./GiftForm";
 import ImageInput from "./ImageInput";
+import QuickShare from "./QuickShare";
 import ColorPicker from "./ColorPicker";
 import { recipientColors, recipientStyle } from "@/lib/recipient-colors";
 const priorities = ["♥ Coup de cœur", "★ Idée prioritaire", "Idée"];
@@ -25,6 +26,7 @@ export default function Admin({
   previews: Record<string, string>;
 }) {
   const router = useRouter();
+  const urlParams = useSearchParams().toString();
   const [view, setView] = useState("people"),
     [listId, setList] = useState(""),
     [person, setPerson] = useState(""),
@@ -52,6 +54,11 @@ export default function Admin({
     [undo, setUndo] = useState<string[]>([]),
     [editingList, setEditingList] = useState<GiftList | undefined>(),
     [organize, setOrganize] = useState(false),
+    [manualOrder, setManualOrder] = useState<string[] | null>(null),
+    [editingPerson, setEditingPerson] = useState(""),
+    [personName, setPersonName] = useState(""),
+    [archivePersonIdeas, setArchivePersonIdeas] = useState(false),
+    [shareProposal, setShareProposal] = useState<Proposal | null>(null),
     [colorPerson, setColorPerson] = useState(""),
     [personColor, setPersonColor] = useState("#eee5fc");
   const draftKey = "kad-draft-" + data.profile.id;
@@ -78,6 +85,34 @@ export default function Admin({
   useEffect(() => {
     checkDraft();
     const params = new URLSearchParams(location.search);
+    const mail = params.get("mail");
+    if (mail) {
+      const statuses: Record<string, string> = {
+        connected: "Votre Gmail est connecté.",
+        not_configured:
+          "La connexion Gmail n’est pas encore configurée dans l’application.",
+        wrong_account:
+          "Connectez le compte Google correspondant à votre email administrateur.",
+        invalid_state: "La connexion a expiré. Réessayez depuis Mon compte.",
+        missing_permission: "L’autorisation d’envoi Gmail est nécessaire.",
+        cancelled: "Connexion Gmail annulée.",
+        failed: "Impossible de connecter Gmail. Réessayez depuis Mon compte.",
+      };
+      setNotice(statuses[mail] || "Connexion Gmail à vérifier.");
+      setModal("account");
+      history.replaceState(null, "", "/");
+    }
+    const requested = params.get("idea");
+    if (requested) {
+      const proposal = data.proposals.find((p) => p.id === requested);
+      if (proposal) {
+        setView("ideas");
+        setForm(proposal);
+      } else setNotice("Cette idée n’est plus accessible.");
+      history.replaceState(null, "", "/");
+      return;
+    }
+
     if (params.get("url") || params.get("title") || params.get("text")) {
       const existing = localStorage.getItem(draftKey);
       if (existing) {
@@ -125,7 +160,7 @@ export default function Admin({
       setForm("new");
       history.replaceState(null, "", "/");
     }
-  }, [checkDraft]);
+  }, [checkDraft, urlParams]);
   useEffect(() => {
     const interval = setInterval(() => router.refresh(), 60000);
     return () => clearInterval(interval);
@@ -133,7 +168,8 @@ export default function Admin({
   function refresh() {
     router.refresh();
   }
-  function done() {
+  function done(message?: string) {
+    if (message) setNotice(message);
     setForm(null);
     setModal("");
     refresh();
@@ -190,7 +226,10 @@ export default function Admin({
   const favorites = Array.isArray(prefs.favorites)
     ? (prefs.favorites as string[])
     : [];
-  const order = Array.isArray(prefs.order) ? (prefs.order as string[]) : [];
+  const order =
+    manualOrder ??
+    (Array.isArray(prefs.order) ? (prefs.order as string[]) : []);
+  useEffect(() => setManualOrder(null), [prefs.order]);
   const sorted = <T extends { id: string }>(rows: T[]) =>
     [...rows].sort(
       (a, b) =>
@@ -210,20 +249,43 @@ export default function Admin({
       "Favoris mis à jour",
     );
   }
-  function move(id: string, ids: string[], delta: number) {
-    const i = ids.indexOf(id),
-      j = i + delta;
-    if (j < 0 || j >= ids.length) return;
-    const arr = [...ids];
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    run(
-      () =>
-        actions.updatePreferences({
-          ...prefs,
-          order: [...arr, ...order.filter((x) => !ids.includes(x))],
-        }),
-      "Ordre enregistré",
+  function canMove(id: string, ids: string[], delta: number) {
+    const at = ids.indexOf(id) + delta;
+    return (
+      !busy &&
+      at >= 0 &&
+      at < ids.length &&
+      favorites.includes(id) === favorites.includes(ids[at])
     );
+  }
+  function saveOrder(arr: string[], ids: string[]) {
+    const next = [...arr, ...order.filter((id) => !ids.includes(id))];
+    setManualOrder(next);
+    void run(async () => {
+      const r = await actions.updatePreferences({ ...prefs, order: next });
+      if (!r.ok) setManualOrder(null);
+      return r;
+    }, "Ordre enregistré");
+  }
+  function move(id: string, ids: string[], delta: number) {
+    if (!canMove(id, ids, delta)) return;
+    const at = ids.indexOf(id),
+      arr = [...ids];
+    [arr[at], arr[at + delta]] = [arr[at + delta], arr[at]];
+    saveOrder(arr, ids);
+  }
+  function dropPerson(id: string, target: string, ids: string[]) {
+    if (
+      !organize ||
+      busy ||
+      id === target ||
+      !ids.includes(id) ||
+      favorites.includes(id) !== favorites.includes(target)
+    )
+      return;
+    const arr = ids.filter((x) => x !== id);
+    arr.splice(arr.indexOf(target), 0, id);
+    saveOrder(arr, ids);
   }
   const normalize = (s: string) =>
     s
@@ -237,14 +299,12 @@ export default function Admin({
       const archived = !!p.archived_at;
       if (view === "archives" ? !archived : archived) return false;
       if (listId && !inList(p, listId, data.proposals)) return false;
+      if (person && p.recipient_id !== person) return false;
       if (
-        person &&
-        (p.recipient_id
-          ? p.recipient_id !== person
-          : !idea.candidates.includes(person))
+        view === "unfiled" &&
+        p.recipient_id &&
+        data.recipients.some((r) => r.id === p.recipient_id && !r.deleted_at)
       )
-        return false;
-      if (view === "unfiled" && (p.recipient_id || idea.candidates.length))
         return false;
       return (
         normalize(
@@ -350,8 +410,11 @@ export default function Admin({
                           data.ideas.some(
                             (i) =>
                               i.id === p.idea_id &&
-                              !i.candidates.length &&
-                              !p.recipient_id,
+                              (!p.recipient_id ||
+                                !data.recipients.some(
+                                  (r) =>
+                                    r.id === p.recipient_id && !r.deleted_at,
+                                )),
                           ),
                       ).length
                     }
@@ -518,9 +581,16 @@ export default function Admin({
                   className="secondary"
                   onClick={() => setOrganize(!organize)}
                 >
-                  {organize ? "Terminer" : "Organiser"}
+                  {organize ? "Terminer" : "Modifier l’ordre"}
                 </button>
               </div>
+              {organize && (
+                <p className="notice">
+                  Utilisez les flèches pour déplacer les fiches, ou glissez-les
+                  sur ordinateur. Les favoris restent en tête : chaque groupe
+                  conserve son propre ordre.
+                </p>
+              )}
               <div className="grid">
                 {view === "lists"
                   ? sorted(
@@ -613,18 +683,36 @@ export default function Admin({
                       </article>
                     ))
                   : sorted(
-                      data.recipients.filter((r) =>
-                        normalize(r.name).includes(normalize(query)),
+                      data.recipients.filter(
+                        (r) =>
+                          !r.deleted_at &&
+                          normalize(r.name).includes(normalize(query)),
                       ),
                     ).map((r, _, arr) => (
                       <article
                         className="person-card"
                         key={r.id}
                         style={recipientStyle(colors[r.id])}
+                        draggable={organize}
+                        onDragStart={(event) =>
+                          event.dataTransfer.setData("text/plain", r.id)
+                        }
+                        onDragOver={(event) => {
+                          if (organize) event.preventDefault();
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          dropPerson(
+                            event.dataTransfer.getData("text/plain"),
+                            r.id,
+                            arr.map((p) => p.id),
+                          );
+                        }}
                       >
                         <button
                           className="text-button card-open"
                           onClick={() => {
+                            if (organize) return;
                             setPerson(r.id);
                             setQuery("");
                           }}
@@ -637,14 +725,7 @@ export default function Admin({
                             {
                               data.proposals.filter(
                                 (p) =>
-                                  !p.archived_at &&
-                                  (p.recipient_id
-                                    ? p.recipient_id === r.id
-                                    : data.ideas.some(
-                                        (i) =>
-                                          i.id === p.idea_id &&
-                                          i.candidates.includes(r.id),
-                                      )),
+                                  !p.archived_at && p.recipient_id === r.id,
                               ).length
                             }{" "}
                             idées
@@ -669,10 +750,32 @@ export default function Admin({
                         >
                           Couleur
                         </button>
+                        {!r.is_common && (
+                          <button
+                            className="secondary"
+                            aria-label={"Modifier " + r.name}
+                            onClick={() => {
+                              setEditingPerson(r.id);
+                              setPersonName(r.name);
+                              setNotice("");
+                              setModal("editPerson");
+                            }}
+                          >
+                            Modifier
+                          </button>
+                        )}
                         {organize && (
                           <>
                             <button
                               className="secondary"
+                              aria-label={"Monter " + r.name}
+                              disabled={
+                                !canMove(
+                                  r.id,
+                                  arr.map((x) => x.id),
+                                  -1,
+                                )
+                              }
                               onClick={() =>
                                 move(
                                   r.id,
@@ -685,6 +788,14 @@ export default function Admin({
                             </button>
                             <button
                               className="secondary"
+                              aria-label={"Descendre " + r.name}
+                              disabled={
+                                !canMove(
+                                  r.id,
+                                  arr.map((x) => x.id),
+                                  1,
+                                )
+                              }
                               onClick={() =>
                                 move(
                                   r.id,
@@ -720,11 +831,13 @@ export default function Admin({
                         onChange={(e) => setPerson(e.target.value)}
                       >
                         <option value="">Tout le monde</option>
-                        {data.recipients.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
-                        ))}
+                        {data.recipients
+                          .filter((r) => !r.deleted_at || view === "archives")
+                          .map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
                       </select>
                     </label>
                     <label>
@@ -960,18 +1073,10 @@ export default function Admin({
                                 Pour qui ?{" "}
                                 <b>
                                   {data.recipients.find(
-                                    (r) => r.id === p.recipient_id,
-                                  )?.name ||
-                                    i.candidates
-                                      .map(
-                                        (id) =>
-                                          data.recipients.find(
-                                            (r) => r.id === id,
-                                          )?.name,
-                                      )
-                                      .filter(Boolean)
-                                      .join(", ") ||
-                                    "À décider"}
+                                    (r) =>
+                                      r.id === p.recipient_id &&
+                                      (!r.deleted_at || !!p.archived_at),
+                                  )?.name || "À classer"}
                                 </b>
                               </p>
                               <p>{formatPrice(i.price_min, i.price_max)}</p>
@@ -1036,6 +1141,12 @@ export default function Admin({
                                 </a>
                               )}
                               <div className="row">
+                                <button
+                                  className="secondary"
+                                  onClick={() => setShareProposal(p)}
+                                >
+                                  Partage rapide
+                                </button>
                                 <button
                                   className="secondary"
                                   onClick={() => {
@@ -1280,6 +1391,119 @@ export default function Admin({
             }}
           >
             Écarter et créer une idée
+          </button>
+        </Modal>
+      )}
+      {shareProposal && (
+        <Modal title="Partage rapide" close={() => setShareProposal(null)}>
+          <QuickShare
+            data={data}
+            proposal={shareProposal}
+            idea={data.ideas.find((i) => i.id === shareProposal.idea_id)}
+          />
+        </Modal>
+      )}
+      {modal === "editPerson" && (
+        <Modal
+          title="Modifier la personne"
+          message={notice}
+          close={() => setModal("")}
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              try {
+                const r = await actions.renameRecipient(
+                  editingPerson,
+                  personName,
+                );
+                if (!r.ok) {
+                  setNotice(r.error);
+                  return;
+                }
+                done("Nom modifié");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <label>
+              Nom de la personne
+              <input
+                required
+                maxLength={100}
+                value={personName}
+                onChange={(e) => setPersonName(e.target.value)}
+              />
+            </label>
+            <button disabled={busy}>Enregistrer le nom</button>
+          </form>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              setArchivePersonIdeas(false);
+              setModal("deletePerson");
+            }}
+          >
+            Supprimer cette personne
+          </button>
+        </Modal>
+      )}
+      {modal === "deletePerson" && (
+        <Modal
+          title={"Supprimer " + personName + " ?"}
+          message={notice}
+          close={() => setModal("")}
+        >
+          <p>
+            Les idées confidentielles de l’autre gestionnaire ne seront jamais
+            modifiées. Elles resteront dans son carnet.
+          </p>
+          <label className="check">
+            <input
+              type="radio"
+              name="personRemoval"
+              checked={!archivePersonIdeas}
+              onChange={() => setArchivePersonIdeas(false)}
+            />
+            Conserver les idées dans À classer
+          </label>
+          <label className="check">
+            <input
+              type="radio"
+              name="personRemoval"
+              checked={archivePersonIdeas}
+              onChange={() => setArchivePersonIdeas(true)}
+            />
+            Retirer les idées du carnet et les conserver aux archives
+          </label>
+          <p>
+            Les réservations concernées seront annulées et les invités prévenus
+            par email si l’envoi est configuré.
+          </p>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const r = await actions.removeRecipient(
+                  editingPerson,
+                  archivePersonIdeas,
+                );
+                if (!r.ok) {
+                  setNotice(r.error);
+                  return;
+                }
+                navigate("people");
+                done("Personne supprimée, idées conservées");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Confirmer la suppression
           </button>
         </Modal>
       )}
@@ -1544,17 +1768,19 @@ export default function Admin({
               <label>
                 Pour qui ?
                 <select name="recipient">
-                  {data.recipients.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
+                  {data.recipients
+                    .filter((r) => !r.deleted_at)
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
                 </select>
               </label>
               <small>
-                Commun remplace les autres personnes possibles. Les attributions
-                existantes sont préservées ; une modification incompatible est
-                refusée.
+                Commun E&A remplace les autres personnes possibles. Les
+                attributions existantes sont préservées ; une modification
+                incompatible est refusée.
               </small>
             </div>
             <button disabled={busy}>Appliquer</button>
@@ -1612,6 +1838,53 @@ export default function Admin({
           close={() => setModal("")}
         >
           <p>{data.profile.email}</p>
+          <section className="gmail-settings">
+            <h3>Envoi depuis mon compte Gmail</h3>
+            <p>
+              Les emails préparés en attente seront envoyés après la connexion.
+            </p>
+            <p>
+              {data.mailbox
+                ? "Compte connecté : " + data.mailbox.email
+                : "Aucun compte Gmail connecté."}
+            </p>
+            <a
+              className="secondary guest-preview-link"
+              href="/api/gmail/connect"
+            >
+              {data.mailbox ? "Reconnecter Gmail" : "Connecter mon Gmail"}
+            </a>
+            {!data.gmailConfigured && (
+              <p className="notice">
+                La configuration Google de l’application doit être terminée
+                avant la première connexion.
+              </p>
+            )}
+            {data.mailbox && (
+              <button
+                className="secondary"
+                onClick={async () => {
+                  const r = await actions.disconnectGmail();
+                  if (r.ok) {
+                    refresh();
+                    setNotice("Gmail déconnecté");
+                  } else setNotice(r.error);
+                }}
+              >
+                Déconnecter Gmail
+              </button>
+            )}
+            <button
+              className="secondary"
+              onClick={async () => {
+                const r = await actions.retryMyEmails();
+                setNotice(r.ok ? r.notice || "Réessai terminé" : r.error);
+              }}
+            >
+              Réessayer les emails en attente
+            </button>
+          </section>
+
           <label className="check">
             <input
               type="checkbox"

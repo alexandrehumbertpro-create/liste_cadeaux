@@ -166,6 +166,15 @@ await sql.query(
     "utf8",
   ),
 );
+await sql.query(
+  await readFile(
+    new URL(
+      "../supabase/migrations/202610240001_people_and_gmail.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 await sql.end();
 await writeFile(
   "/tmp/kad-integration-credentials.json",

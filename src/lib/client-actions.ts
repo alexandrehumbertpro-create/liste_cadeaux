@@ -8,8 +8,7 @@ function safe<Args extends unknown[], R extends { ok: boolean }>(
     } catch {
       return {
         ok: false,
-        error:
-          "La connexion a été interrompue. Réessayez.",
+        error: "La connexion a été interrompue. Réessayez.",
       };
     }
   };
@@ -33,3 +32,9 @@ export const login = safe(server.login),
   addCandidate = safe(server.addCandidate);
 export const logout = server.logout;
 export type Result<T = unknown> = server.Result<T>;
+
+export const renameRecipient = safe(server.renameRecipient),
+  removeRecipient = safe(server.removeRecipient),
+  shareIdeaEmail = safe(server.shareIdeaEmail),
+  disconnectGmail = safe(server.disconnectGmail),
+  retryMyEmails = safe(server.retryMyEmails);

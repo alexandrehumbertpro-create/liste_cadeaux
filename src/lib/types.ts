@@ -31,7 +31,12 @@ export type Proposal = {
   archived_at: string | null;
   created_at: string;
 };
-export type Recipient = { id: string; name: string; is_common: boolean };
+export type Recipient = {
+  id: string;
+  name: string;
+  is_common: boolean;
+  deleted_at?: string | null;
+};
 export type GiftList = {
   id: string;
   name: string;
@@ -56,6 +61,8 @@ export type Activity = {
   created_at: string;
 };
 export type Dataset = {
+  mailbox?: { email: string; connected_at: string } | null;
+  gmailConfigured?: boolean;
   ideas: Idea[];
   proposals: Proposal[];
   lists: GiftList[];

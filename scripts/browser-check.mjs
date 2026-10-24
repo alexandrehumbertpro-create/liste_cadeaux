@@ -79,9 +79,7 @@ try {
       await d.getByRole("button", { name: "Alex", exact: true }).click();
       await d.getByRole("button", { name: listName, exact: true }).click();
       await d.getByLabel("Qui peut voir cette idée ?").selectOption("public");
-      await d
-        .getByText("Prix, priorité et précisions", { exact: true })
-        .click();
+      await d.getByText("Précisions", { exact: true }).click();
       await d.getByLabel("Prix minimum (€)", { exact: true }).fill("40");
       await d.getByLabel("Maximum, facultatif (€)").fill("60");
       await d.getByLabel("Priorité", { exact: true }).selectOption("0");

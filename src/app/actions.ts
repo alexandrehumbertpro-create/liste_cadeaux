@@ -11,13 +11,22 @@ import {
 } from "@/lib/supabase/server";
 import { giftInput, reservationInput, imageReference } from "@/lib/validation";
 import { drainEmails } from "@/lib/mail";
+import { gmailConfigured, mailbox } from "@/lib/gmail";
 import { signImage } from "@/lib/images";
 export type Result<T = unknown> =
-  { ok: true; data?: T } | { ok: false; error: string };
+  { ok: true; data?: T; notice?: string } | { ok: false; error: string };
 function message(error: unknown) {
   const text =
     error instanceof Error ? error.message : "Une erreur est survenue.";
+  if (text.includes("duplicate key value"))
+    return "Ce nom est déjà utilisé. Choisissez un autre nom.";
   const known: Record<string, string> = {
+    recipient_exists: "Cette personne existe déjà.",
+    common_is_protected: "Commun E&A ne peut pas être modifié ni supprimé.",
+    private_notification_forbidden:
+      "Une idée privée ne peut pas être envoyée à l’autre administrateur.",
+    recipient_not_found: "Personne introuvable.",
+    invalid_name: "Indiquez un nom valide.",
     gift_unavailable:
       "Ce cadeau vient d’être réservé ou n’est plus disponible.",
     invalid_contribution: "Vérifiez le montant restant.",
@@ -32,7 +41,7 @@ function message(error: unknown) {
     active_collective_participations:
       "Retirez les participations avant de désactiver le cadeau collectif.",
     common_is_exclusive:
-      "Commun ne peut pas être sélectionné avec une autre personne.",
+      "Commun E&A ne peut pas être sélectionné avec une autre personne.",
   };
   return Object.entries(known).find(([k]) => text.includes(k))?.[1] ?? text;
 }
@@ -65,15 +74,24 @@ export async function logout() {
 }
 export async function saveGift(input: unknown): Promise<Result<string>> {
   try {
-    const { db } = await requireAdmin(),
+    const { db, user } = await requireAdmin(),
       data = giftInput.parse(input);
-    const { data: id, error } = await db.rpc("save_gift_for_recipients", {
+    const { data: id, error } = await db.rpc("save_gift_with_notifications", {
       data,
     });
     if (error) throw new Error(error.message);
     revalidatePath("/");
     await drainEmails();
-    return { ok: true, data: id };
+    const connected = data.notifyIds?.length ? await mailbox(user.id) : null;
+    return {
+      ok: true,
+      data: id,
+      notice: data.notifyIds?.length
+        ? connected && gmailConfigured()
+          ? "Idée enregistrée. Notification par email préparée."
+          : "Idée enregistrée. Notification en attente : connectez votre compte Gmail depuis Mon compte."
+        : undefined,
+    };
   } catch (e) {
     return {
       ok: false,
@@ -86,17 +104,15 @@ export async function createRecipient(
 ): Promise<Result<{ id: string }>> {
   try {
     const { db } = await requireAdmin();
-    const { data: recipient, error } = await db
-      .from("recipients")
-      .insert({ name: z.string().trim().min(1).max(100).parse(name) })
-      .select("id")
-      .single();
+    const { data: recipient, error } = await db.rpc("add_recipient", {
+      new_name: z.string().trim().min(1).max(100).parse(name),
+    });
     if (error)
       throw new Error(
         error.code === "23505" ? "Ce destinataire existe déjà." : error.message,
       );
     revalidatePath("/");
-    return { ok: true, data: { id: recipient!.id } };
+    return { ok: true, data: { id: recipient! } };
   } catch (e) {
     return { ok: false, error: message(e) };
   }
@@ -173,7 +189,7 @@ export async function resetGift(
     if (error) throw new Error(error.message);
     revalidatePath("/");
     const delivery = await drainEmails();
-    return { ok: true, data: { emailConfigured: delivery.configured } };
+    return { ok: true, data: { emailConfigured: delivery.resendConfigured } };
   } catch (e) {
     return { ok: false, error: message(e) };
   }
@@ -429,6 +445,127 @@ export async function addCandidate(
     if (updateError) throw new Error(updateError.message);
     revalidatePath("/");
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: message(e) };
+  }
+}
+
+export async function renameRecipient(
+  id: string,
+  name: string,
+): Promise<Result> {
+  try {
+    const { db } = await requireAdmin();
+    const { error } = await db.rpc("rename_recipient", {
+      person: z.uuid().parse(id),
+      new_name: z.string().trim().min(1).max(100).parse(name),
+    });
+    if (error) throw Error(error.message);
+    revalidatePath("/");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: message(e) };
+  }
+}
+export async function removeRecipient(
+  id: string,
+  archive: boolean,
+): Promise<Result> {
+  try {
+    const { db } = await requireAdmin();
+    const { error } = await db.rpc("remove_recipient", {
+      person: z.uuid().parse(id),
+      archive_ideas: archive,
+    });
+    if (error) throw Error(error.message);
+    revalidatePath("/");
+    await drainEmails();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: message(e) };
+  }
+}
+export async function shareIdeaEmail(
+  proposalId: string,
+  to: string,
+): Promise<Result> {
+  try {
+    const { db, user } = await requireAdmin();
+    await throttle("share");
+    const address = z.email().max(254).parse(to);
+    const { data: proposal } = await db
+      .from("proposals")
+      .select("idea_id")
+      .eq("id", z.uuid().parse(proposalId))
+      .single();
+    if (!proposal) throw Error("Idée inaccessible.");
+    const { data: job, error } = await serviceClient()
+      .from("email_jobs")
+      .insert({
+        email: address,
+        kind: "quick_share",
+        payload: {
+          senderProfileId: user.id,
+          ideaId: proposal.idea_id,
+          proposalId,
+        },
+      })
+      .select("id")
+      .single();
+    if (error) throw Error("Impossible de préparer cet email.");
+    await drainEmails();
+    const { data: state } = await serviceClient()
+      .from("email_jobs")
+      .select("status,last_error")
+      .eq("id", job.id)
+      .single();
+    return {
+      ok: true,
+      notice:
+        state?.status === "sent"
+          ? "Email envoyé depuis votre compte Gmail."
+          : state?.status === "cancelled"
+            ? "Envoi annulé : l’accès à l’idée a changé."
+            : "Email enregistré en attente. Connectez ou reconnectez votre compte Gmail depuis Mon compte.",
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof z.ZodError
+          ? "Indiquez une adresse email valide."
+          : message(e),
+    };
+  }
+}
+export async function disconnectGmail(): Promise<Result> {
+  try {
+    const { user } = await requireAdmin();
+    const { error } = await serviceClient()
+      .from("admin_mailboxes")
+      .delete()
+      .eq("profile_id", user.id);
+    if (error) throw Error("Impossible de déconnecter Gmail.");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: message(e) };
+  }
+}
+export async function retryMyEmails(): Promise<Result> {
+  try {
+    const { user } = await requireAdmin();
+    if (!gmailConfigured() || !(await mailbox(user.id)))
+      throw Error(
+        "Connectez votre compte Gmail avant de réessayer les emails.",
+      );
+    await serviceClient()
+      .from("email_jobs")
+      .update({ attempts: 0 })
+      .eq("status", "pending")
+      .eq("payload->>senderProfileId", user.id);
+    await drainEmails();
+    return { ok: true, notice: "Les emails en attente ont été réessayés." };
   } catch (e) {
     return { ok: false, error: message(e) };
   }

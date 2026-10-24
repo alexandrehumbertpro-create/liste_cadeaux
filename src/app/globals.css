@@ -1018,3 +1018,28 @@ button[data-recipient] {
   max-width: 100%;
   white-space: normal;
 }
+.gift-essential {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  margin: 12px 0;
+}
+.notify-add {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.gmail-settings {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  margin: 15px 0;
+}
+.gmail-settings button,
+.gmail-settings a {
+  margin: 5px;
+}
+.person-card[draggable="true"] {
+  cursor: grab;
+}

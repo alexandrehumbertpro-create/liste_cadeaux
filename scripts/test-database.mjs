@@ -55,6 +55,15 @@ try {
       "utf8",
     ),
   );
+  await db.query(
+    await readFile(
+      new URL(
+        "../supabase/migrations/202610240001_people_and_gmail.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   const alex = randomUUID(),
     elise = randomUUID(),
     outsider = randomUUID();
@@ -600,6 +609,235 @@ try {
         )
       ).rows;
       assert.equal(jobs.length, 2);
+    },
+  );
+
+  const customInput = (person, visibility = "public") => ({
+    title: "Nouvelle idée test",
+    description: "Description partageable",
+    specifications: "Bleu",
+    privateNote: "NE_JAMAIS_ENVOYER",
+    url: "https://example.test/produit",
+    imageUrl: "",
+    imageCredit: null,
+    priceMin: 30,
+    priceMax: null,
+    visibility,
+    candidates: [person],
+    recipientId: person,
+    listIds: [list.id],
+    global: false,
+    priority: 1,
+    collective: false,
+    targetAmount: null,
+  });
+  await check(
+    "Commun E&A ne peut être renommé, supprimé ou transformé",
+    async () => {
+      const common = (
+        await db.query("select id,name from recipients where is_common")
+      ).rows[0];
+      assert.equal(common.name, "Commun E&A");
+      await assert.rejects(
+        admin(alex, "select rename_recipient($1,'Autre')", [common.id]),
+        /common_is_protected/,
+      );
+      await assert.rejects(
+        admin(alex, "select remove_recipient($1,false)", [common.id]),
+        /common_is_protected/,
+      );
+      await assert.rejects(
+        admin(alex, "delete from recipients where id=$1", [common.id]),
+        /common_is_protected|permission denied/,
+      );
+      await assert.rejects(
+        admin(alex, "update recipients set is_common=false where id=$1", [
+          common.id,
+        ]),
+        /common_is_protected/,
+      );
+    },
+  );
+  await check(
+    "Renommer une personne conserve ses cadeaux et met à jour le nom invité",
+    async () => {
+      await admin(alex, "update lists set archived_at=null where id=$1", [
+        list.id,
+      ]);
+      const person = (
+        await admin(
+          alex,
+          "insert into recipients(name) values('Renommage') returning id",
+        )
+      ).rows[0].id;
+      const pid = (
+        await admin(alex, "select save_gift_for_recipients($1::jsonb) id", [
+          customInput(person),
+        ])
+      ).rows[0].id;
+      await admin(elise, "select rename_recipient($1,'Nouveau nom')", [person]);
+      assert.equal(
+        (
+          await db.query("select shared_list($1) data", [list.share_token])
+        ).rows[0].data.gifts.find((g) => g.id === pid).recipient,
+        "Nouveau nom",
+      );
+    },
+  );
+  await check(
+    "Supprimer vers À classer garde les idées et protège celles qui sont privées",
+    async () => {
+      const person = (
+        await admin(
+          alex,
+          "insert into recipients(name) values('À supprimer') returning id",
+        )
+      ).rows[0].id;
+      const publicGift = (
+        await admin(alex, "select save_gift_for_recipients($1::jsonb) id", [
+          customInput(person),
+        ])
+      ).rows[0].id;
+      const privateGift = (
+        await admin(elise, "select save_gift_for_recipients($1::jsonb) id", [
+          customInput(person, "private"),
+        ])
+      ).rows[0].id;
+      await reserve(publicGift);
+      await admin(alex, "select remove_recipient($1,false)", [person]);
+      const p = (
+        await db.query("select * from proposals where id=$1", [publicGift])
+      ).rows[0];
+      assert.equal(p.recipient_id, null);
+      assert.deepEqual(p.list_ids, [list.id]);
+      assert.equal(p.reserved, false);
+      assert.equal(p.archived_at, null);
+      assert.equal(
+        (
+          await db.query("select recipient_id from proposals where id=$1", [
+            privateGift,
+          ])
+        ).rows[0].recipient_id,
+        person,
+      );
+      await assert.rejects(reserve(publicGift), /gift_unavailable/);
+      assert.ok(
+        (
+          await db.query("select deleted_at from recipients where id=$1", [
+            person,
+          ])
+        ).rows[0].deleted_at,
+      );
+      await assert.rejects(
+        admin(alex, "select save_gift_for_recipients($1::jsonb)", [
+          customInput(person),
+        ]),
+        /recipient_not_found/,
+      );
+    },
+  );
+  await check(
+    "Supprimer avec retrait conserve les cadeaux aux archives",
+    async () => {
+      const person = (
+        await admin(
+          alex,
+          "insert into recipients(name) values('Archives personne') returning id",
+        )
+      ).rows[0].id;
+      const gift = (
+        await admin(alex, "select save_gift_for_recipients($1::jsonb) id", [
+          customInput(person),
+        ])
+      ).rows[0].id;
+      await admin(alex, "select remove_recipient($1,true)", [person]);
+      const p = (await db.query("select * from proposals where id=$1", [gift]))
+        .rows[0];
+      assert.ok(p.archived_at);
+      assert.equal(p.archive_reason, "abandoned");
+      assert.match(p.archive_note, /suppression/);
+    },
+  );
+  await check(
+    "Prévenir de l’ajout prépare un email sans note privée et interdit les fuites",
+    async () => {
+      const data = { ...customInput(recipient), notifyIds: [elise] };
+      const p = (
+        await admin(alex, "select save_gift_with_notifications($1::jsonb) id", [
+          data,
+        ])
+      ).rows[0].id;
+      const jobs = (
+        await db.query(
+          "select * from email_jobs where kind='idea_added' and payload->>'proposalId'=$1",
+          [p],
+        )
+      ).rows;
+      assert.equal(jobs.length, 1);
+      assert.equal(jobs[0].email, "elise@example.test");
+      assert.equal(jobs[0].payload.senderProfileId, alex);
+      assert.equal(JSON.stringify(jobs).includes("NE_JAMAIS_ENVOYER"), false);
+      await assert.rejects(
+        admin(alex, "select save_gift_with_notifications($1::jsonb)", [
+          { ...data, visibility: "private" },
+        ]),
+        /private_notification_forbidden/,
+      );
+      await assert.rejects(
+        admin(alex, "select save_gift_with_notifications($1::jsonb)", [
+          { ...data, notifyIds: [randomUUID()] },
+        ]),
+        /invalid_notification_recipient/,
+      );
+    },
+  );
+  await check(
+    "Recréer une personne supprimée réactive sa fiche sans doublon",
+    async () => {
+      const person = (
+        await admin(alex, "select add_recipient('Réactivation') id")
+      ).rows[0].id;
+      await admin(alex, "select remove_recipient($1,false)", [person]);
+      const restored = (
+        await admin(alex, "select add_recipient('Réactivation') id")
+      ).rows[0].id;
+      assert.equal(restored, person);
+      assert.equal(
+        (
+          await db.query("select deleted_at from recipients where id=$1", [
+            person,
+          ])
+        ).rows[0].deleted_at,
+        null,
+      );
+    },
+  );
+  await check(
+    "Les jetons Gmail sont inaccessibles aux administrateurs et aux invités",
+    async () => {
+      await db.query(
+        "insert into admin_mailboxes(profile_id,email,refresh_token) values($1,'alex@example.test','encrypted-test-only')",
+        [alex],
+      );
+      await assert.rejects(
+        admin(alex, "select * from admin_mailboxes"),
+        /permission denied/,
+      );
+      await assert.rejects(
+        admin(elise, "select * from admin_mailboxes"),
+        /permission denied/,
+      );
+      const rows = (
+        await db.query("select * from claim_email_jobs_for_provider('gmail')")
+      ).rows;
+      assert.ok(rows.length);
+      assert.ok(
+        rows.every((r) => ["idea_added", "quick_share"].includes(r.kind)),
+      );
+      await assert.rejects(
+        admin(alex, "select * from claim_email_jobs_for_provider('gmail')"),
+        /permission denied/,
+      );
     },
   );
   console.log(`${checks} vérifications PostgreSQL réussies.`);

@@ -1,3 +1,4 @@
+import { mailbox, gmailConfigured } from "@/lib/gmail";
 import { redirect } from "next/navigation";
 import { configured, serverClient } from "@/lib/supabase/server";
 import { signImage } from "@/lib/images";
@@ -29,7 +30,7 @@ export default async function Home({
   if (!user) {
     const shared = await searchParams;
     const carry = new URLSearchParams();
-    for (const key of ["title", "text", "url"]) {
+    for (const key of ["title", "text", "url", "idea"]) {
       const value = shared[key];
       if (typeof value === "string") carry.set(key, value.slice(0, 3000));
     }
@@ -72,6 +73,8 @@ export default async function Home({
           profiles,
           activity,
           shares,
+          mailbox: await mailbox(user.id),
+          gmailConfigured: gmailConfigured(),
         } as unknown as Dataset
       }
       previews={previews}

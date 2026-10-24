@@ -96,3 +96,18 @@ Les photos sont préparées dans le navigateur (JPEG, bord maximal 2048 px, envo
 Dans Pour qui, Couleur personnalise chaque carte. La même couleur est reprise dans la sélection des personnes lors de l’ajout d’une idée. Cette personnalisation, comme les favoris, appartient au compte connecté et est conservée dans ses préférences Supabase. Les personnes peuvent aussi être créées avec leur couleur directement dans le formulaire d’idée.
 
 Vérifications locales supplémentaires : `node scripts/browser-check-capture.mjs`, `node scripts/browser-check-colors.mjs`, `HEIC_TEST_FILE=/chemin/fixture.heic node scripts/test-photo-preparation.mjs`. Les deux premiers scripts exigent la pile d’intégration jetable et ses comptes de test ; TEST_APP_URL doit être une adresse locale. Le troisième exige Chromium et une fixture HEIC locale.
+
+## Personnes, notifications d’ajout et partage rapide
+
+Avant de déployer cette version sur un projet existant, appliquer `supabase/migrations/202610240001_people_and_gmail.sql`. Pour un projet neuf, appliquer toutes les migrations dans l’ordre.
+
+- « Modifier l’ordre » affiche des commandes de déplacement et autorise le glisser-déposer sur ordinateur. Les favoris restent en tête ; chaque groupe garde son ordre personnel. Les flèches sont désactivées à la frontière des groupes.
+- Une personne peut être renommée ou supprimée. La suppression propose de garder ses cadeaux dans À classer ou de retirer ses cadeaux actifs en les conservant aux archives. Les associations aux listes sont conservées, mais les cadeaux sans personne active disparaissent de la vue invitée. Les réservations concernées sont annulées. Les idées privées de l’autre administrateur ne sont pas modifiées ; si leur personne a été supprimée, elles apparaissent comme non classées chez leur propriétaire. Les anciens destinataires restent consultables dans les archives. Recréer un nom supprimé réactive sa fiche.
+- « Commun E&A » est protégé contre le renommage, la suppression et le changement du statut commun.
+- Le prix et la priorité sont accessibles directement dans le formulaire. Les précisions restent dépliables.
+- « Prévenir de l’ajout ? » permet de choisir Elise et/ou Alex après le bouton d’enregistrement. Les adresses sont celles des profils administrateur, sans adresses personnelles codées dans le client. Une idée privée ne peut notifier que son propriétaire.
+- Le partage rapide est réservé aux administrateurs : message WhatsApp prérempli ou email direct depuis le compte Gmail connecté. Il ne contient jamais les notes de gestion ou les identités des réservants.
+
+Pour activer l’envoi réel, suivre [GMAIL_SETUP.md](GMAIL_SETUP.md). La configuration Google et l’autorisation de chaque administrateur sont nécessaires ; les messages restent en attente tant qu’elles ne sont pas terminées. La connexion OAuth n’a pas été réalisée avec un compte réel pendant le développement.
+
+Vérification locale supplémentaire : `TEST_APP_URL=http://localhost:3000 node scripts/browser-check-people-mail.mjs`, sur la pile d’intégration jetable uniquement.

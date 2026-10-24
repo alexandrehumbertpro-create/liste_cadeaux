@@ -23,6 +23,7 @@ export const imageReference = z
 const nullableNumber = z.number().finite().min(0).max(999999999).nullable();
 export const giftInput = z
   .object({
+    notifyIds: z.array(z.uuid()).max(2).optional(),
     ideaId: z.uuid().optional(),
     proposalId: z.uuid().optional(),
     title: z.string().trim().min(1).max(200),

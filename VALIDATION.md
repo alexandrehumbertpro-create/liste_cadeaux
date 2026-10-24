@@ -47,3 +47,13 @@ Le lien fourni a été demandé sans son fragment de navigation. Le tunnel HTTPS
 - Les notifications de déréservation sont en file d’envoi. L’interface distingue un fournisseur email configuré d’un service absent. La livraison réelle par Resend n’a pas été testée ; elle nécessite les variables sécurisées Vercel RESEND_API_KEY, EMAIL_FROM et APP_URL.
 
 - Compilation de production validée avec Next.js 16.4.3, mis à jour après l’alerte de sécurité de la version 16.4.0. Les correctifs compatibles de dépendances ont été appliqués ; `npm audit` ne signale plus de vulnérabilité. Les parcours capture/couleurs et les 13 parcours de régression ont été rejoués avec la version corrigée et passent.
+
+## Gestion des personnes et Gmail — 24 octobre 2026
+
+- TypeScript et compilation de production Next.js 16.4.3 : validés, y compris les points d’entrée OAuth Google.
+- 28 tests unitaires : conservation des contrôles existants ; chiffrement AES-GCM des jetons, détection d’altération, encodage MIME et pièces jointes ; refus des injections d’en-têtes ; absence de note privée dans le partage ; état OAuth invalide refusé ; compte Google différent refusé ; stockage du jeton chiffré seulement ; authentification requise et domaine public conservé derrière le proxy.
+- 27 scénarios PostgreSQL : protection de Commun E&A, renommage visible pour les invités, suppression vers À classer en conservant les listes, suppression vers archives, protection des idées privées de l’autre administrateur, réactivation sans doublon, notification d’ajout atomique et accès aux jetons Gmail refusé aux deux rôles clients.
+- 13 parcours navigateur de régression et le parcours couleurs passent. Le nouveau parcours `browser-check-people-mail.mjs` vérifie les flèches mobiles et le glisser-déposer ordinateur, l’ordre conservé après rechargement, le renommage, l’accès direct aux prix/priorité, la notification en file d’envoi, le partage rapide sans note privée, les deux choix de suppression, les noms historiques dans les archives, les cases de notification bloquées pour une idée privée et l’état de configuration Gmail.
+- Aucun email réel envoyé. Les échanges OAuth sont simulés dans les tests. Le test d’envoi Gmail avec les deux comptes réels reste à effectuer après création des identifiants Google et connexion explicite de chaque compte.
+- Migration exécutée uniquement sur les bases jetables locales. Le projet Supabase distant et le site Vercel restent inchangés jusqu’à l’application de la migration par le propriétaire.
+- Guide d’activation préparé dans GMAIL_SETUP.md. Variables Vercel nécessaires : GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et APP_URL. Les notifications de réservation antérieures continuent d’utiliser Resend.

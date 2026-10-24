@@ -47,7 +47,7 @@ export default function GiftForm({
   proposal?: Proposal;
   preview?: string;
   draft?: GiftInput & { draftPreview?: string };
-  done: () => void;
+  done: (notice?: string) => void;
   onDraft: () => void;
   defaultRecipientId?: string;
   defaultListId?: string;
@@ -72,9 +72,16 @@ export default function GiftForm({
             priceMin: idea.price_min,
             priceMax: idea.price_max,
             visibility: idea.visibility,
-            candidates: proposal?.recipient_id
-              ? [proposal.recipient_id]
-              : idea.candidates,
+            candidates: proposal
+              ? proposal.recipient_id &&
+                data.recipients.some(
+                  (r) => r.id === proposal.recipient_id && !r.deleted_at,
+                )
+                ? [proposal.recipient_id]
+                : []
+              : idea.candidates.filter((id) =>
+                  data.recipients.some((r) => r.id === id && !r.deleted_at),
+                ),
             recipientId: proposal?.recipient_id ?? null,
             listIds: proposal?.list_ids ?? [],
             global: false,
@@ -193,6 +200,9 @@ export default function GiftForm({
             ? v.recipientId
             : (v.candidates[0] ?? null),
           global: false,
+          notifyIds: (v.notifyIds || []).filter(
+            (id) => v.visibility !== "private" || id === data.profile.id,
+          ),
         });
         setBusy(false);
         if (!r.ok) {
@@ -202,7 +212,7 @@ export default function GiftForm({
         saved.current = true;
         if (!idea) localStorage.removeItem(draftKey);
         onDraft();
-        done();
+        done(r.notice);
       }}
     >
       {!idea && (
@@ -280,6 +290,53 @@ export default function GiftForm({
           onChange={(e) => change("title", e.target.value)}
         />
       </label>
+      <section className="gift-essential" aria-label="Prix et priorité">
+        {" "}
+        <div className="row">
+          <label>
+            Prix minimum (€)
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={v.priceMin ?? ""}
+              onChange={(e) =>
+                change(
+                  "priceMin",
+                  e.target.value === "" ? null : Number(e.target.value),
+                )
+              }
+            />
+          </label>
+          <label>
+            Maximum, facultatif (€)
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={v.priceMax ?? ""}
+              onChange={(e) =>
+                change(
+                  "priceMax",
+                  e.target.value === "" ? null : Number(e.target.value),
+                )
+              }
+            />
+          </label>
+        </div>
+        <label>
+          Priorité
+          <select
+            aria-label="Priorité"
+            value={v.priority}
+            onChange={(e) => change("priority", Number(e.target.value))}
+          >
+            <option value="0">♥ Coup de cœur</option>
+            <option value="1">★ Idée prioritaire</option>
+            <option value="2">Idée</option>
+          </select>
+        </label>
+      </section>
       <ImageInput
         value={v.imageUrl}
         change={(path, preview) => {
@@ -346,46 +403,48 @@ export default function GiftForm({
       <fieldset>
         <legend>Pour qui ?</legend>
         <div className="chips">
-          {data.recipients.map((p) => (
-            <button
-              type="button"
-              className={
-                "chip " + (v.candidates.includes(p.id) ? "selected" : "")
-              }
-              key={p.id}
-              style={recipientStyle(colors[p.id])}
-              aria-pressed={v.candidates.includes(p.id)}
-              data-recipient={p.id}
-              onClick={() => {
-                const ids = v.candidates.includes(p.id)
-                  ? v.candidates.filter((id) => id !== p.id)
-                  : p.is_common
-                    ? [p.id]
-                    : [
-                        ...v.candidates.filter(
-                          (id) =>
-                            !data.recipients.find((r) => r.id === id)
-                              ?.is_common,
-                        ),
-                        p.id,
-                      ];
-                set((old) => ({
-                  ...old,
-                  candidates: ids,
-                  recipientId: ids.includes(old.recipientId ?? "")
-                    ? old.recipientId
-                    : (ids[0] ?? null),
-                }));
-              }}
-            >
-              {p.name}
-              {v.candidates.includes(p.id) ? (
-                <span aria-hidden="true"> ✓</span>
-              ) : (
-                ""
-              )}
-            </button>
-          ))}
+          {data.recipients
+            .filter((p) => !p.deleted_at)
+            .map((p) => (
+              <button
+                type="button"
+                className={
+                  "chip " + (v.candidates.includes(p.id) ? "selected" : "")
+                }
+                key={p.id}
+                style={recipientStyle(colors[p.id])}
+                aria-pressed={v.candidates.includes(p.id)}
+                data-recipient={p.id}
+                onClick={() => {
+                  const ids = v.candidates.includes(p.id)
+                    ? v.candidates.filter((id) => id !== p.id)
+                    : p.is_common
+                      ? [p.id]
+                      : [
+                          ...v.candidates.filter(
+                            (id) =>
+                              !data.recipients.find((r) => r.id === id)
+                                ?.is_common,
+                          ),
+                          p.id,
+                        ];
+                  set((old) => ({
+                    ...old,
+                    candidates: ids,
+                    recipientId: ids.includes(old.recipientId ?? "")
+                      ? old.recipientId
+                      : (ids[0] ?? null),
+                  }));
+                }}
+              >
+                {p.name}
+                {v.candidates.includes(p.id) ? (
+                  <span aria-hidden="true"> ✓</span>
+                ) : (
+                  ""
+                )}
+              </button>
+            ))}
           <button
             type="button"
             className="chip"
@@ -545,51 +604,7 @@ export default function GiftForm({
             : "aucune liste invitée, visible par les gestionnaires"}
       </p>
       <details open={Boolean(idea) || Boolean(metadataStatus)}>
-        <summary>Prix, priorité et précisions</summary>
-        <div className="row">
-          <label>
-            Prix minimum (€)
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={v.priceMin ?? ""}
-              onChange={(e) =>
-                change(
-                  "priceMin",
-                  e.target.value === "" ? null : Number(e.target.value),
-                )
-              }
-            />
-          </label>
-          <label>
-            Maximum, facultatif (€)
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={v.priceMax ?? ""}
-              onChange={(e) =>
-                change(
-                  "priceMax",
-                  e.target.value === "" ? null : Number(e.target.value),
-                )
-              }
-            />
-          </label>
-        </div>
-        <label>
-          Priorité
-          <select
-            aria-label="Priorité"
-            value={v.priority}
-            onChange={(e) => change("priority", Number(e.target.value))}
-          >
-            <option value="0">♥ Coup de cœur</option>
-            <option value="1">★ Idée prioritaire</option>
-            <option value="2">Idée</option>
-          </select>
-        </label>
+        <summary>Précisions</summary>
         <label>
           Description
           <textarea
@@ -656,6 +671,50 @@ export default function GiftForm({
             ? "Enregistrer les modifications"
             : "Garder cette idée"}
       </button>
+      {!proposal && (
+        <fieldset className="notify-add">
+          <legend>Prévenir de l’ajout ?</legend>
+          {["Elise", "Alex"]
+            .map((name) =>
+              data.profile.display_name === name
+                ? data.profile
+                : data.profiles.find((p) => p.display_name === name),
+            )
+            .filter((p) => !!p)
+            .map((p) => (
+              <label className="check" key={p!.id}>
+                <input
+                  type="checkbox"
+                  disabled={
+                    v.visibility === "private" && p!.id !== data.profile.id
+                  }
+                  checked={
+                    !(
+                      v.visibility === "private" && p!.id !== data.profile.id
+                    ) && (v.notifyIds || []).includes(p!.id)
+                  }
+                  onChange={(e) =>
+                    change(
+                      "notifyIds",
+                      e.target.checked
+                        ? [...new Set([...(v.notifyIds || []), p!.id])]
+                        : (v.notifyIds || []).filter((id) => id !== p!.id),
+                    )
+                  }
+                />
+                {p!.display_name}
+              </label>
+            ))}
+          <small>
+            {v.visibility === "private"
+              ? "Une idée privée ne peut être envoyée qu’à vous-même."
+              : "Un email sera envoyé après l’enregistrement de l’idée."}{" "}
+            {!data.mailbox
+              ? "Connectez votre compte Gmail depuis Mon compte pour envoyer les notifications."
+              : ""}
+          </small>
+        </fieldset>
+      )}
     </form>
   );
 }
