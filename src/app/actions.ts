@@ -9,7 +9,7 @@ import {
   serverClient,
   serviceClient,
 } from "@/lib/supabase/server";
-import { giftInput, reservationInput } from "@/lib/validation";
+import { giftInput, reservationInput, imageReference } from "@/lib/validation";
 import { drainEmails } from "@/lib/mail";
 import { signImage } from "@/lib/images";
 export type Result<T = unknown> =
@@ -81,18 +81,22 @@ export async function saveGift(input: unknown): Promise<Result<string>> {
     };
   }
 }
-export async function createRecipient(name: string): Promise<Result> {
+export async function createRecipient(
+  name: string,
+): Promise<Result<{ id: string }>> {
   try {
     const { db } = await requireAdmin();
-    const { error } = await db
+    const { data: recipient, error } = await db
       .from("recipients")
-      .insert({ name: z.string().trim().min(1).max(100).parse(name) });
+      .insert({ name: z.string().trim().min(1).max(100).parse(name) })
+      .select("id")
+      .single();
     if (error)
       throw new Error(
         error.code === "23505" ? "Ce destinataire existe déjà." : error.message,
       );
     revalidatePath("/");
-    return { ok: true };
+    return { ok: true, data: { id: recipient!.id } };
   } catch (e) {
     return { ok: false, error: message(e) };
   }
@@ -110,7 +114,7 @@ export async function saveList(input: {
         id: z.uuid().optional(),
         name: z.string().trim().min(1).max(150),
         slogan: z.string().max(1000),
-        imageUrl: z.string().nullable(),
+        imageUrl: imageReference.nullable(),
       })
       .parse(input);
     const row = {
@@ -156,7 +160,10 @@ export async function archiveGift(
     return { ok: false, error: message(e) };
   }
 }
-export async function resetGift(id: string, restore = false): Promise<Result> {
+export async function resetGift(
+  id: string,
+  restore = false,
+): Promise<Result<{ emailConfigured: boolean }>> {
   try {
     const { db } = await requireAdmin();
     const { error } = await db.rpc("reset_gift", {
@@ -165,8 +172,8 @@ export async function resetGift(id: string, restore = false): Promise<Result> {
     });
     if (error) throw new Error(error.message);
     revalidatePath("/");
-    await drainEmails();
-    return { ok: true };
+    const delivery = await drainEmails();
+    return { ok: true, data: { emailConfigured: delivery.configured } };
   } catch (e) {
     return { ok: false, error: message(e) };
   }

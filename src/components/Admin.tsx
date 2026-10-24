@@ -7,7 +7,10 @@ import { budgetOverlap, formatPrice, inList } from "@/lib/validation";
 import * as actions from "@/lib/client-actions";
 import Modal from "./Modal";
 import GiftForm from "./GiftForm";
-const priorities = ["♥ Coup de cœur", "★ Top idée", "Bonne idée"];
+import ImageInput from "./ImageInput";
+import ColorPicker from "./ColorPicker";
+import { recipientColors, recipientStyle } from "@/lib/recipient-colors";
+const priorities = ["♥ Coup de cœur", "★ Idée prioritaire", "Idée"];
 const reasons: Record<string, string> = {
   offered: "Offert",
   abandoned: "Idée écartée",
@@ -35,6 +38,11 @@ export default function Admin({
     [form, setForm] = useState<Proposal | "new" | null>(null),
     [draft, setDraft] = useState<GiftInput | undefined>(),
     [hasDraft, setHasDraft] = useState(false),
+    [draftInfo, setDraftInfo] = useState<{
+      title: string;
+      url: string;
+      image: string;
+    } | null>(null),
     [modal, setModal] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
@@ -43,14 +51,28 @@ export default function Admin({
     [reuse, setReuse] = useState(false),
     [undo, setUndo] = useState<string[]>([]),
     [editingList, setEditingList] = useState<GiftList | undefined>(),
-    [organize, setOrganize] = useState(false);
+    [organize, setOrganize] = useState(false),
+    [colorPerson, setColorPerson] = useState(""),
+    [personColor, setPersonColor] = useState("#eee5fc");
   const draftKey = "kad-draft-" + data.profile.id;
   const checkDraft = useCallback(() => {
     try {
       const v = JSON.parse(localStorage.getItem(draftKey) || "null");
       setHasDraft(Boolean(v && (v.title || v.url || v.imageUrl)));
+      setDraftInfo(
+        v
+          ? {
+              title: v.title || "Idée à compléter",
+              url: v.url || "",
+              image: /^https?:/.test(v.draftPreview || v.imageUrl || "")
+                ? v.draftPreview || v.imageUrl
+                : "",
+            }
+          : null,
+      );
     } catch {
       setHasDraft(false);
+      setDraftInfo(null);
     }
   }, [draftKey]);
   useEffect(() => {
@@ -164,6 +186,7 @@ export default function Admin({
     }
   }
   const prefs = data.profile.preferences;
+  const colors = recipientColors(prefs);
   const favorites = Array.isArray(prefs.favorites)
     ? (prefs.favorites as string[])
     : [];
@@ -382,7 +405,15 @@ export default function Admin({
               </button>
             )}
             {view === "people" && !person && (
-              <button onClick={() => setModal("person")}>+ Destinataire</button>
+              <button
+                onClick={() => {
+                  setPersonColor("#eee5fc");
+                  setNotice("");
+                  setModal("person");
+                }}
+              >
+                + Personne
+              </button>
             )}
           </div>
           {undo.length > 0 && (
@@ -417,7 +448,8 @@ export default function Admin({
           )}
           {hasDraft && (
             <button className="draft-banner" onClick={resume}>
-              ✎ Votre brouillon vous attend <span>Reprendre →</span>
+              ✎ Brouillon : {draftInfo?.title || "Idée à compléter"}{" "}
+              <span>Reprendre →</span>
             </button>
           )}
           {currentList && (
@@ -585,7 +617,11 @@ export default function Admin({
                         normalize(r.name).includes(normalize(query)),
                       ),
                     ).map((r, _, arr) => (
-                      <article className="person-card" key={r.id}>
+                      <article
+                        className="person-card"
+                        key={r.id}
+                        style={recipientStyle(colors[r.id])}
+                      >
                         <button
                           className="text-button card-open"
                           onClick={() => {
@@ -620,6 +656,18 @@ export default function Admin({
                           onClick={() => favorite(r.id)}
                         >
                           {favorites.includes(r.id) ? "★" : "☆"}
+                        </button>
+                        <button
+                          className="secondary color-edit"
+                          aria-label={"Changer la couleur de " + r.name}
+                          onClick={() => {
+                            setNotice("");
+                            setColorPerson(r.id);
+                            setPersonColor(colors[r.id] || "#eee5fc");
+                            setModal("personColor");
+                          }}
+                        >
+                          Couleur
                         </button>
                         {organize && (
                           <>
@@ -663,7 +711,7 @@ export default function Admin({
                   onChange={(e) => setQuery(e.target.value)}
                 />
                 <details>
-                  <summary>Affiner · destinataire, budget, priorité</summary>
+                  <summary>Affiner · pour qui, budget, priorité</summary>
                   <div className="filter-grid">
                     <label>
                       Pour qui
@@ -1077,13 +1125,28 @@ export default function Admin({
                                           "Remettre ce cadeau à disposition ? Les réservants seront prévenus par email si le service est configuré.",
                                         )
                                       )
-                                        run(
-                                          () => actions.resetGift(p.id),
-                                          "Réservation annulée, cadeau disponible",
-                                        );
+                                        void (async () => {
+                                          setBusy(true);
+                                          try {
+                                            const result =
+                                              await actions.resetGift(p.id);
+                                            if (!result.ok) {
+                                              setNotice(result.error);
+                                              return;
+                                            }
+                                            refresh();
+                                            setNotice(
+                                              result.data?.emailConfigured
+                                                ? "Réservation annulée, cadeau disponible. Notification par email préparée."
+                                                : "Réservation annulée, cadeau disponible. Notification conservée en attente : le service d’emails doit être configuré.",
+                                            );
+                                          } finally {
+                                            setBusy(false);
+                                          }
+                                        })();
                                     }}
                                   >
-                                    Remettre à disposition
+                                    Déréserver cette idée
                                   </button>
                                 </div>
                               )}
@@ -1193,7 +1256,18 @@ export default function Admin({
       )}
       {modal === "draft" && (
         <Modal title="Votre brouillon vous attend" close={() => setModal("")}>
-          <p>Reprenez-le ou écartez-le avant de commencer une autre idée.</p>
+          <div className="draft-summary">
+            {draftInfo?.image && (
+              <img src={draftInfo.image} alt="Illustration du brouillon" />
+            )}
+            <div>
+              <strong>{draftInfo?.title}</strong>
+              {draftInfo?.url && <p className="draft-url">{draftInfo.url}</p>}
+            </div>
+          </div>
+          <p>
+            Reprenez cette idée ou écartez-la avant d’en commencer une autre.
+          </p>
           <button onClick={resume}>Reprendre</button>
           <button
             className="secondary"
@@ -1209,22 +1283,75 @@ export default function Admin({
           </button>
         </Modal>
       )}
+      {modal === "personColor" && (
+        <Modal
+          message={notice}
+          title={
+            "Couleur de " +
+            (data.recipients.find((r) => r.id === colorPerson)?.name ||
+              "la personne")
+          }
+          close={() => setModal("")}
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              try {
+                const result = await actions.updatePreferences({
+                  ...prefs,
+                  recipientColors: { ...colors, [colorPerson]: personColor },
+                });
+                if (!result.ok) {
+                  setNotice(result.error);
+                  return;
+                }
+                setModal("");
+                refresh();
+                setNotice("Couleur enregistrée");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <ColorPicker value={personColor} change={setPersonColor} />
+            <button disabled={busy}>Enregistrer la couleur</button>
+          </form>
+        </Modal>
+      )}
       {modal === "person" && (
-        <Modal title="Nouveau destinataire" close={() => setModal("")}>
+        <Modal
+          message={notice}
+          title="Ajouter une personne"
+          close={() => setModal("")}
+        >
           <form
             onSubmit={async (e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
               const r = await actions.createRecipient(String(f.get("name")));
-              if (r.ok) done();
-              else setNotice(r.error);
+              if (!r.ok) {
+                setNotice(r.error);
+                return;
+              }
+              const saved = await actions.updatePreferences({
+                ...prefs,
+                recipientColors: { ...colors, [r.data!.id]: personColor },
+              });
+              if (!saved.ok)
+                setNotice(
+                  "Personne créée. La couleur n’a pas pu être enregistrée : " +
+                    saved.error,
+                );
+              done();
             }}
           >
             <label>
               Nom
               <input name="name" required maxLength={100} />
             </label>
-            <button>Créer le destinataire</button>
+            <ColorPicker value={personColor} change={setPersonColor} />
+            <button>Créer la personne</button>
           </form>
         </Modal>
       )}
@@ -1374,9 +1501,7 @@ export default function Admin({
                   <option value="archive">Archiver</option>
                   <option value="list">Ajouter à une liste</option>
                   <option value="removeList">Retirer d’une liste</option>
-                  <option value="person">
-                    Ajouter un destinataire possible
-                  </option>
+                  <option value="person">Ajouter une personne</option>
                 </select>
               </label>
             )}
@@ -1417,7 +1542,7 @@ export default function Admin({
             </div>
             <div hidden={modal === "archive" || bulkAction !== "person"}>
               <label>
-                Destinataire possible
+                Pour qui ?
                 <select name="recipient">
                   {data.recipients.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -1574,28 +1699,27 @@ function ListForm({
         <textarea name="slogan" defaultValue={list?.slogan} />
       </label>
       {url && (
-        <img className="cover-preview" src={url} alt="Couverture choisie" />
-      )}
-      <label>
-        Photo de couverture
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            setBusy(true);
-            const f = new FormData();
-            f.set("file", file);
-            const r = await actions.uploadImage(f);
-            setBusy(false);
-            if (r.ok && r.data) {
-              setImage(r.data.path);
-              setUrl(r.data.url);
-            } else if (!r.ok) setError(r.error);
-          }}
+        <img
+          className="cover-preview"
+          src={url}
+          alt="Couverture choisie"
+          onError={() =>
+            setError(
+              "Cette image ne peut pas être affichée. Vérifiez son URL ou importez une photo.",
+            )
+          }
         />
-      </label>
+      )}
+      <ImageInput
+        value={image ?? ""}
+        change={(path, preview) => {
+          setImage(path || null);
+          setUrl(preview);
+        }}
+        busy={busy}
+        setBusy={setBusy}
+        error={setError}
+      />
       {error && <p role="alert">{error}</p>}
       <button disabled={busy}>Enregistrer la liste</button>
     </form>

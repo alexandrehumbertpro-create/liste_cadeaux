@@ -16,6 +16,7 @@ export default function Guest({
   const [person, setPerson] = useState(""),
     [max, setMax] = useState(""),
     [status, setStatus] = useState(""),
+    [priority, setPriority] = useState(""),
     [gift, setGift] = useState<SharedGift | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -28,6 +29,7 @@ export default function Guest({
     .filter(
       (g) =>
         (!person || g.recipientId === person) &&
+        (priority === "" || g.priority === Number(priority)) &&
         budgetOverlap(g.priceMin, g.priceMax, null, max ? Number(max) : null) &&
         (!status || (status === "reserved" ? g.reserved : !g.reserved)),
     )
@@ -87,6 +89,18 @@ export default function Guest({
                 />
               </label>
               <label>
+                Priorité
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                >
+                  <option value="">Toutes les priorités</option>
+                  <option value="0">♥ Coup de cœur</option>
+                  <option value="1">★ Idée prioritaire</option>
+                  <option value="2">Idée</option>
+                </select>
+              </label>
+              <label>
                 Disponibilité
                 <select
                   value={status}
@@ -125,6 +139,11 @@ export default function Guest({
                           }
                         >
                           <div className="gift-image">
+                            {reserved && (
+                              <span className="reserved-badge">
+                                Déjà réservé
+                              </span>
+                            )}
                             {g.imageUrl ? (
                               <img src={g.imageUrl} alt="" />
                             ) : (
@@ -132,9 +151,11 @@ export default function Guest({
                             )}
                             <span className="badge">
                               {
-                                ["♥ Coup de cœur", "★ Top idée", "Bonne idée"][
-                                  g.priority
-                                ]
+                                [
+                                  "♥ Coup de cœur",
+                                  "★ Idée prioritaire",
+                                  "Idée",
+                                ][g.priority]
                               }
                             </span>
                           </div>
@@ -178,10 +199,12 @@ export default function Guest({
                               </p>
                             )}
                             {reserved ? (
-                              <p>✓ Déjà réservé</p>
+                              <p className="reservation-action">
+                                ✓ Déjà réservé
+                              </p>
                             ) : (
                               <button
-                                className="wide"
+                                className="wide reservation-action"
                                 onClick={() => {
                                   setGift(g);
                                   setError("");

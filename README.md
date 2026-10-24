@@ -88,3 +88,11 @@ Voir aussi le [cahier des charges](CAHIER_DES_CHARGES.md) et l’[audit UX](AUDI
 Pour un projet existant, appliquer `supabase/migrations/202610130001_simplify_capture.sql` dans Supabase SQL Editor **avant** de déployer cette version. Ne pas rejouer la migration initiale. La migration conserve les idées, listes et réservations ; elle remplace les appartenances globales par des appartenances explicites aux listes existantes. Pour une nouvelle installation, appliquer les deux migrations dans l’ordre.
 
 Le bouton de récupération affiche les champs trouvés et l’aperçu image. L’extraction lit Open Graph, Twitter Cards et les produits JSON-LD. Un site qui bloque les accès automatiques ou charge ses informations uniquement en JavaScript peut nécessiter une saisie manuelle.
+
+## Capture et personnalisation
+
+Les photos sont préparées dans le navigateur (JPEG, bord maximal 2048 px, envoi inférieur à 2 Mo) pour rester sous les limites de requête de l’hébergement. Les fichiers HEIC sont convertis à la demande. Les liens directs d’images http/https sont utilisables pour les idées et les couvertures, avec aperçu.
+
+Dans Pour qui, Couleur personnalise chaque carte. La même couleur est reprise dans la sélection des personnes lors de l’ajout d’une idée. Cette personnalisation, comme les favoris, appartient au compte connecté et est conservée dans ses préférences Supabase. Les personnes peuvent aussi être créées avec leur couleur directement dans le formulaire d’idée.
+
+Vérifications locales supplémentaires : `node scripts/browser-check-capture.mjs`, `node scripts/browser-check-colors.mjs`, `HEIC_TEST_FILE=/chemin/fixture.heic node scripts/test-photo-preparation.mjs`. Les deux premiers scripts exigent la pile d’intégration jetable et ses comptes de test ; TEST_APP_URL doit être une adresse locale. Le troisième exige Chromium et une fixture HEIC locale.

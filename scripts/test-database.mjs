@@ -558,6 +558,50 @@ try {
       );
     },
   );
+
+  await check(
+    "Déréserver prévient chaque participant et ne renvoie pas deux notifications",
+    async () => {
+      await admin(alex, "update lists set archived_at=null where id=$1", [
+        list.id,
+      ]);
+      const gift = await make("public", true);
+      const first = await reserve(gift, 30);
+      const second = await reserve(gift, 40);
+      await admin(elise, "select reset_gift($1,false)", [gift]);
+      const p = (
+        await db.query(
+          "select reserved,contributed from proposals where id=$1",
+          [gift],
+        )
+      ).rows[0];
+      assert.equal(p.reserved, false);
+      assert.equal(Number(p.contributed), 0);
+      // Inspect the actual reservation tokens rather than names in admin notifications.
+      const reservations = (
+        await db.query(
+          "select access_token from reservations where proposal_id=$1",
+          [gift],
+        )
+      ).rows;
+      const access = reservations.map((r) => r.access_token);
+      let jobs = (
+        await db.query(
+          "select payload from email_jobs where kind='changed' and payload->>'title'='Cadeau remis à disposition' and payload->>'accessToken'=any($1)",
+          [access],
+        )
+      ).rows;
+      assert.equal(jobs.length, 2);
+      await admin(elise, "select reset_gift($1,false)", [gift]);
+      jobs = (
+        await db.query(
+          "select payload from email_jobs where kind='changed' and payload->>'title'='Cadeau remis à disposition' and payload->>'accessToken'=any($1)",
+          [access],
+        )
+      ).rows;
+      assert.equal(jobs.length, 2);
+    },
+  );
   console.log(`${checks} vérifications PostgreSQL réussies.`);
 } finally {
   await db.end();

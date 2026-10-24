@@ -79,12 +79,14 @@ const origin = process.env.TEST_APP_URL || "http://localhost:3000";
           title: "Atelier import " + width,
           description: "Deux heures de création",
           price: 49.9,
-          image:
-            "data:image/svg+xml," +
-            encodeURIComponent(
-              '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="pink"/></svg>',
-            ),
+          image: "https://images.example.test/photo.jpg",
         },
+      }),
+    );
+    await p.route("https://images.example.test/photo.jpg", (r) =>
+      r.fulfill({
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="pink"/></svg>',
       }),
     );
     await dlg.getByRole("button", { name: "Récupérer", exact: true }).click();

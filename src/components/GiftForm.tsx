@@ -1,14 +1,17 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import { useRouter } from "next/navigation";
 import type { Dataset, Idea, Proposal } from "@/lib/types";
 import type { GiftInput } from "@/lib/validation";
 import {
   saveGift,
-  uploadImage,
   createRecipient,
   saveList,
+  updatePreferences,
 } from "@/lib/client-actions";
+import ImageInput from "./ImageInput";
+import ColorPicker from "./ColorPicker";
+import { recipientColors, recipientStyle } from "@/lib/recipient-colors";
 const initial: GiftInput = {
   title: "",
   description: "",
@@ -43,13 +46,15 @@ export default function GiftForm({
   idea?: Idea;
   proposal?: Proposal;
   preview?: string;
-  draft?: GiftInput;
+  draft?: GiftInput & { draftPreview?: string };
   done: () => void;
   onDraft: () => void;
   defaultRecipientId?: string;
   defaultListId?: string;
 }) {
   const router = useRouter();
+  const linkId = useId();
+  const colors = recipientColors(data.profile.preferences);
   const [v, set] = useState<GiftInput>(
     () =>
       draft ??
@@ -84,10 +89,15 @@ export default function GiftForm({
             listIds: defaultListId ? [defaultListId] : [],
           }),
   );
-  const [image, setImage] = useState(preview ?? draft?.imageUrl ?? ""),
+  const [image, setImage] = useState(
+      preview ?? draft?.draftPreview ?? draft?.imageUrl ?? "",
+    ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [metadataStatus, setMetadataStatus] = useState(""),
+    [metadataError, setMetadataError] = useState(""),
+    [newPersonName, setNewPersonName] = useState<string | null>(null),
+    [newPersonColor, setNewPersonColor] = useState("#eee5fc"),
     [imageFailed, setImageFailed] = useState(false),
     [q, setQ] = useState(""),
     [photos, setPhotos] = useState<
@@ -104,7 +114,10 @@ export default function GiftForm({
   useEffect(() => {
     if (!idea && !saved.current) {
       try {
-        localStorage.setItem(draftKey, JSON.stringify(v));
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({ ...v, draftPreview: image }),
+        );
         onDraft();
       } catch {
         setError(
@@ -112,22 +125,9 @@ export default function GiftForm({
         );
       }
     }
-  }, [v, draftKey, idea, onDraft]);
+  }, [v, image, draftKey, idea, onDraft]);
   function change<K extends keyof GiftInput>(key: K, value: GiftInput[K]) {
     set((old) => ({ ...old, [key]: value }));
-  }
-  async function upload(file: File | undefined) {
-    if (!file) return;
-    setBusy(true);
-    const f = new FormData();
-    f.set("file", file);
-    const r = await uploadImage(f);
-    setBusy(false);
-    if (r.ok && r.data) {
-      change("imageUrl", r.data.path);
-      change("imageCredit", null);
-      setImage(r.data.url);
-    } else if (!r.ok) setError(r.error);
   }
   async function extract() {
     if (!v.url) {
@@ -135,7 +135,7 @@ export default function GiftForm({
       return;
     }
     setBusy(true);
-    setError("");
+    setMetadataError("");
     setMetadataStatus(
       "Recherche du nom, de la photo, du prix et de la description…",
     );
@@ -175,7 +175,7 @@ export default function GiftForm({
       );
     } catch (e) {
       setMetadataStatus("");
-      setError(
+      setMetadataError(
         (e as Error).message + " Vous pouvez compléter les champs à la main.",
       );
     }
@@ -211,15 +211,22 @@ export default function GiftForm({
           l’enregistrement.
         </p>
       )}
-      <label>
-        Lien du produit
-        <div className="row">
-          <input
-            type="url"
-            value={v.url}
-            placeholder="https://…"
-            onChange={(e) => change("url", e.target.value)}
-          />
+      <label htmlFor={linkId}>Lien du produit</label>
+      <div className="row metadata-controls">
+        <input
+          type="url"
+          id={linkId}
+          aria-describedby={linkId + "-feedback"}
+          value={v.url}
+          placeholder="https://…"
+          disabled={busy}
+          onChange={(e) => {
+            change("url", e.target.value);
+            setMetadataError("");
+            setMetadataStatus("");
+          }}
+        />
+        <div className="metadata-action">
           <button
             type="button"
             className="secondary"
@@ -228,16 +235,19 @@ export default function GiftForm({
           >
             {busy ? "En cours…" : "Récupérer"}
           </button>
+          <div id={linkId + "-feedback"} aria-live="polite">
+            {metadataError ? (
+              <p className="error" role="alert">
+                {metadataError}
+              </p>
+            ) : metadataStatus ? (
+              <p className="hint" role="status">
+                {metadataStatus}
+              </p>
+            ) : null}
+          </div>
         </div>
-      </label>
-      <div aria-live="polite" role="status">
-        {metadataStatus && <p className="notice">{metadataStatus}</p>}
       </div>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
       <div className="metadata-preview">
         {image ? (
           <figure>
@@ -270,25 +280,17 @@ export default function GiftForm({
           onChange={(e) => change("title", e.target.value)}
         />
       </label>
-      <div className="image-tools">
-        <label className="file-button">
-          Importer une photo
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={(e) => upload(e.target.files?.[0])}
-          />
-        </label>
-        <label className="file-button">
-          Prendre une photo
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => upload(e.target.files?.[0])}
-          />
-        </label>
-      </div>
+      <ImageInput
+        value={v.imageUrl}
+        change={(path, preview) => {
+          set((old) => ({ ...old, imageUrl: path, imageCredit: null }));
+          setImage(preview);
+          setImageFailed(false);
+        }}
+        busy={busy}
+        setBusy={setBusy}
+        error={setError}
+      />
       <details>
         <summary>Illustrer avec Unsplash</summary>
         <div className="row">
@@ -351,6 +353,9 @@ export default function GiftForm({
                 "chip " + (v.candidates.includes(p.id) ? "selected" : "")
               }
               key={p.id}
+              style={recipientStyle(colors[p.id])}
+              aria-pressed={v.candidates.includes(p.id)}
+              data-recipient={p.id}
               onClick={() => {
                 const ids = v.candidates.includes(p.id)
                   ? v.candidates.filter((id) => id !== p.id)
@@ -374,23 +379,96 @@ export default function GiftForm({
               }}
             >
               {p.name}
+              {v.candidates.includes(p.id) ? (
+                <span aria-hidden="true"> ✓</span>
+              ) : (
+                ""
+              )}
             </button>
           ))}
           <button
             type="button"
             className="chip"
-            onClick={async () => {
-              const name = prompt("Nom du nouveau destinataire");
-              if (name) {
-                const r = await createRecipient(name);
-                if (r.ok) router.refresh();
-                else setError(r.error);
-              }
+            onClick={() => {
+              setNewPersonName("");
+              setNewPersonColor("#eee5fc");
             }}
           >
-            + Destinataire
+            + Personne
           </button>
         </div>
+        {newPersonName !== null && (
+          <div className="inline-person">
+            <label>
+              Nom de la nouvelle personne
+              <input
+                value={newPersonName}
+                maxLength={100}
+                onChange={(e) => setNewPersonName(e.target.value)}
+              />
+            </label>
+            <ColorPicker value={newPersonColor} change={setNewPersonColor} />
+            <div className="row">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  if (!newPersonName.trim()) {
+                    setError("Indiquez le nom de la personne.");
+                    return;
+                  }
+                  setBusy(true);
+                  setError("");
+                  try {
+                    const result = await createRecipient(newPersonName.trim());
+                    if (!result.ok) {
+                      setError(result.error);
+                      return;
+                    }
+                    const id = result.data!.id;
+                    const saved = await updatePreferences({
+                      ...data.profile.preferences,
+                      recipientColors: { ...colors, [id]: newPersonColor },
+                    });
+                    if (!saved.ok)
+                      setError(
+                        "Personne créée. La couleur n’a pas pu être enregistrée.",
+                      );
+                    set((old) => {
+                      const candidates = [
+                        ...old.candidates.filter(
+                          (c) =>
+                            !data.recipients.find((r) => r.id === c)?.is_common,
+                        ),
+                        id,
+                      ];
+                      return {
+                        ...old,
+                        candidates,
+                        recipientId: candidates.includes(old.recipientId ?? "")
+                          ? old.recipientId
+                          : id,
+                      };
+                    });
+                    setNewPersonName(null);
+                    router.refresh();
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Créer et sélectionner
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setNewPersonName(null)}
+              >
+                Annuler l’ajout de personne
+              </button>
+            </div>
+          </div>
+        )}
       </fieldset>
       <fieldset>
         <legend>Dans quelles listes ?</legend>
@@ -508,8 +586,8 @@ export default function GiftForm({
             onChange={(e) => change("priority", Number(e.target.value))}
           >
             <option value="0">♥ Coup de cœur</option>
-            <option value="1">★ Top idée</option>
-            <option value="2">Bonne idée</option>
+            <option value="1">★ Idée prioritaire</option>
+            <option value="2">Idée</option>
           </select>
         </label>
         <label>

@@ -1,4 +1,25 @@
 import { z } from "zod";
+export const imageReference = z
+  .string()
+  .trim()
+  .max(4000)
+  .refine((value) => {
+    if (
+      !value ||
+      /^storage:[a-f0-9-]+\/[a-f0-9-]+\.(jpeg|jpg|png|webp|gif)$/i.test(value)
+    )
+      return true;
+    try {
+      const url = new URL(value);
+      return (
+        ["http:", "https:"].includes(url.protocol) &&
+        !url.username &&
+        !url.password
+      );
+    } catch {
+      return false;
+    }
+  }, "Utilisez le lien direct d’une image en http ou https.");
 const nullableNumber = z.number().finite().min(0).max(999999999).nullable();
 export const giftInput = z
   .object({
@@ -12,7 +33,7 @@ export const giftInput = z
       z.literal(""),
       z.url().refine((v) => /^https?:\/\//.test(v)),
     ]),
-    imageUrl: z.string().max(4000),
+    imageUrl: imageReference,
     imageCredit: z
       .object({
         name: z.string().max(200),

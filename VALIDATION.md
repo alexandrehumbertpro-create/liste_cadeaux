@@ -34,3 +34,16 @@ L’application n’est pas publiée. La configuration réutilisable de l’envi
 ## Vérification du lien Cdiscount De’Longhi — 19 octobre 2026
 
 Le lien fourni a été demandé sans son fragment de navigation. Le tunnel HTTPS a abouti ; la réponse de la destination est HTTP 403 avec une page HTML intitulée « Accès bloquéCdiscount.fr », sans données Open Graph, JSON-LD ni titre de produit. L’extraction automatique de ce produit n’est donc pas validée. Le code distingue maintenant les blocages HTTP 401/403/429 et les pages de vérification servies en HTML ; ces pages ne doivent jamais préremplir une idée avec leur titre. Aucun prix ni image n’a été déduit du lien ou inventé.
+
+## Capture, fenêtres et couleurs — 24 octobre 2026
+
+- 19 tests unitaires : références d’images http/https, rejet des URL avec identifiants ou protocoles exécutables, couleurs valides et contraste.
+- 20 scénarios PostgreSQL : la remise à disposition crée une notification pour chaque réservation active, annule les participations et ne duplique pas les notifications si elle est répétée.
+- 13 parcours navigateur de régression ont passé avec auth et données locales réelles.
+- `browser-check-capture.mjs` : titre du brouillon, fenêtre conservée sur clic dans ses marges et glisser hors de la fenêtre, fermeture par Échap/croix/extérieur, erreur de récupération adjacente au bouton, fichier photo illisible géré sans fermeture, URL image pour cadeau et couverture, filtres de priorités invités, alignement des boutons à 390 et 1440 px, gris/badge, déréservation depuis la liste et disponibilité retrouvée côté invité.
+- `browser-check-colors.mjs` : palette lors de la création, modification d’une teinte, persistance après rechargement, contraste, couleur identique dans les chips Pour qui, création colorée et sélection directement depuis le formulaire d’idée.
+- `HEIC_TEST_FILE=/tmp/kad-test.heic node scripts/test-photo-preparation.mjs` : conversion d’un vrai fichier HEIC en JPEG (373 Ko) et réduction d’une image PNG de 26 Mo sous 2 Mo. La fixture HEIC de test provient de `strukturag/libheif/examples/example.heic` ; elle n’est pas incluse dans le dépôt. Compression et conversion réalisées dans Chromium. Pas de test sur un appareil photo physique ni d’envoi réel via le Storage de production pendant cette session.
+- Le brouillon mémorise un aperçu local pour reconnaître aussi une idée ajoutée par photo. Les couleurs sont des préférences personnelles du compte, synchronisées avec Supabase ; aucune colonne ni migration supplémentaire.
+- Les notifications de déréservation sont en file d’envoi. L’interface distingue un fournisseur email configuré d’un service absent. La livraison réelle par Resend n’a pas été testée ; elle nécessite les variables sécurisées Vercel RESEND_API_KEY, EMAIL_FROM et APP_URL.
+
+- Compilation de production validée avec Next.js 16.4.3, mis à jour après l’alerte de sécurité de la version 16.4.0. Les correctifs compatibles de dépendances ont été appliqués ; `npm audit` ne signale plus de vulnérabilité. Les parcours capture/couleurs et les 13 parcours de régression ont été rejoués avec la version corrigée et passent.

@@ -864,3 +864,157 @@ dialog > header h2 {
   outline: 3px solid var(--purple);
   outline-offset: 3px;
 }
+/* Capture: keep extraction feedback beside its action on every screen. */
+.metadata-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+}
+.metadata-controls > input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.metadata-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.metadata-action > button {
+  flex-shrink: 0;
+}
+.metadata-action > div {
+  flex: 1;
+  min-width: 0;
+}
+.metadata-action p {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.image-input {
+  margin: 18px 0;
+}
+.draft-summary {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 14px;
+  background: #f5eeff;
+  border-radius: 15px;
+}
+.draft-summary img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.draft-summary > div {
+  min-width: 0;
+}
+.draft-url {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.guest .gift-card {
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+}
+.guest .gift-image {
+  flex-shrink: 0;
+}
+.guest .gift-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.guest .reservation-action {
+  margin-top: auto;
+  padding-top: 12px;
+}
+.guest button.reservation-action {
+  padding: 12px 10px;
+}
+.gift-image > .reserved-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  bottom: auto;
+  font-size: 12px !important;
+  color: #333;
+  background: #eee;
+  border: 1px solid #777;
+  border-radius: 20px;
+  padding: 6px 10px;
+  font-weight: 700;
+}
+.guest .reserved {
+  filter: grayscale(1);
+  color: #555;
+  background: #efefef;
+}
+.guest .gift-body .reservation-action {
+  margin-top: auto;
+}
+.person-icon {
+  color: var(--ink);
+}
+.color-edit {
+  margin-left: 8px;
+}
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.color-swatches button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.color-swatches button[aria-pressed="true"] {
+  outline: 2px solid var(--purple);
+}
+.color-swatches span {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #0002;
+  border-radius: 50%;
+}
+.color-picker input[type="color"] {
+  height: 48px;
+  max-width: 100px;
+  padding: 3px;
+  cursor: pointer;
+}
+button[data-recipient][aria-pressed="true"] {
+  outline: 3px solid var(--purple);
+  outline-offset: 2px;
+}
+button[data-recipient]:hover {
+  filter: none;
+}
+.inline-person {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 16px;
+}
+.inline-person > .row {
+  flex-wrap: wrap;
+}
+.person-card h2,
+button[data-recipient] {
+  overflow-wrap: anywhere;
+}
+button[data-recipient] {
+  max-width: 100%;
+  white-space: normal;
+}

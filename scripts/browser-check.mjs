@@ -38,14 +38,12 @@ try {
   await check("Connexion réelle d’Alex sur mobile", () => login(page, "Alex"));
   await check("Création d’un destinataire et d’une liste", async () => {
     await page.getByRole("button", { name: "☺ Pour qui" }).click();
-    await page
-      .getByRole("button", { name: "+ Destinataire", exact: true })
-      .click();
+    await page.getByRole("button", { name: "+ Personne", exact: true }).click();
     await page
       .getByRole("dialog")
       .getByLabel("Nom", { exact: true })
       .fill(personName);
-    await page.getByRole("button", { name: "Créer le destinataire" }).click();
+    await page.getByRole("button", { name: "Créer la personne" }).click();
     await page
       .getByRole("heading", { name: personName, exact: true })
       .waitFor();
@@ -67,9 +65,7 @@ try {
     await page.getByLabel("Votre idée", { exact: true }).fill(ideaName);
     await page.getByRole("button", { name: "Fermer", exact: true }).click();
     await page.reload();
-    await page
-      .getByRole("button", { name: /Votre brouillon vous attend/ })
-      .click();
+    await page.getByRole("button", { name: /Brouillon :/ }).click();
     await page.getByLabel("Votre idée", { exact: true }).waitFor();
     assert.equal(
       await page.getByLabel("Votre idée", { exact: true }).inputValue(),
@@ -167,7 +163,9 @@ try {
   );
   await check("Identité masquée jusqu’au retournement explicite", async () => {
     await page.reload();
-    await page.getByRole("button", { name: "✦ Mes idées", exact: true }).click();
+    await page
+      .getByRole("button", { name: "✦ Mes idées", exact: true })
+      .click();
     await page.getByRole("heading", { name: /Déjà réservés/ }).waitFor();
     assert.equal(
       await page.getByText("Sophie et Marc", { exact: true }).count(),
@@ -260,6 +258,8 @@ try {
   await check("L’invité peut annuler depuis son lien personnel", async () => {
     await guest.getByRole("link", { name: "Ma réservation" }).click();
     await guest.getByRole("heading", { name: "Votre réservation" }).waitFor();
+    await guest.bringToFront();
+    await guest.waitForLoadState("networkidle");
     guest.once("dialog", (dialog) => dialog.accept());
     await guest.getByRole("button", { name: "Annuler ma réservation" }).click();
     await guest

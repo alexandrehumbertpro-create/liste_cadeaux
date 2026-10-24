@@ -1,6 +1,8 @@
+import { recipientColors, recipientStyle } from "../src/lib/recipient-colors";
 import { describe, it, expect } from "vitest";
 import {
   budgetOverlap,
+  imageReference,
   giftInput,
   reservationInput,
 } from "../src/lib/validation";
@@ -184,5 +186,35 @@ describe("Pages de blocage marchand", () => {
         "https://shop.example/produit",
       ),
     ).toThrow(/site marchand bloque/);
+  });
+});
+
+describe("Liens d’illustration", () => {
+  it("accepte une image web ou stockée et rejette les protocoles et identifiants inappropriés", () => {
+    expect(
+      imageReference.safeParse("https://shop.example/photo.jpg").success,
+    ).toBe(true);
+    expect(
+      imageReference.safeParse("storage:abc-def/123-456.jpeg").success,
+    ).toBe(true);
+    for (const url of [
+      "javascript:alert(1)",
+      "data:image/svg+xml,test",
+      "https://login:password@shop.example/image.jpg",
+    ])
+      expect(imageReference.safeParse(url).success).toBe(false);
+  });
+});
+
+describe("Couleurs des personnes", () => {
+  it("ne réutilise que les couleurs hexadécimales valides et garde un texte contrasté", () => {
+    expect(
+      recipientColors({
+        recipientColors: { a: "#ffeecc", b: "url(https://example.test)" },
+      }),
+    ).toEqual({ a: "#ffeecc" });
+    expect(recipientStyle("#000000").color).toBe("#ffffff");
+    expect(recipientStyle("#ffffff").color).toBe("#000000");
+    expect(recipientStyle("invalid").backgroundColor).toBe("#eee5fc");
   });
 });
