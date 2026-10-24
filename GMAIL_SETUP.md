@@ -15,10 +15,11 @@ Ne pas rejouer les migrations précédentes sur un projet déjà initialisé. Su
 3. Ouvrir **Google Auth Platform** (ou « Écran de consentement OAuth », selon l’interface).
 4. Renseigner le nom de l’application et l’adresse de contact. Pour des adresses Gmail personnelles, sélectionner une audience **Externe**.
 5. Dans les accès aux données/scopes, demander `openid`, `email` et `https://www.googleapis.com/auth/gmail.send`. L’application ne demande pas de lecture de la boîte de réception.
-6. Si l’application est en mode **Test**, ajouter les deux adresses Gmail administrateur comme utilisateurs de test. Ces adresses sont celles visibles dans « Mon compte » dans Kad’Humbert.
-7. Créer un **client OAuth → Application Web**.
-8. Ajouter une URI de redirection autorisée : `https://VOTRE-DOMAINE/api/gmail/callback`. Avec le domaine de production actuel, ce sera `https://listecadeaux-mauve.vercel.app/api/gmail/callback`. Utiliser le domaine principal du projet, pas une adresse temporaire de déploiement.
-9. Copier l’ID client et le secret client **uniquement dans les variables sécurisées Vercel**, jamais dans la conversation ou dans Git.
+6. Dans **Branding**, enregistrer la page d’accueil HTTPS et la politique de confidentialité publique : `https://listecadeaux-mauve.vercel.app/confidentialite` (adapter si le domaine change). La page est aussi accessible depuis l’écran de connexion du site. Ne pas renseigner un lien de conditions d’utilisation inexistant.
+7. Si l’application est en mode **Test**, ajouter les deux adresses Gmail administrateur comme utilisateurs de test. Ces adresses sont celles visibles dans « Mon compte » dans Kad’Humbert.
+8. Créer un **client OAuth → Application Web**.
+9. Ajouter une URI de redirection autorisée : `https://VOTRE-DOMAINE/api/gmail/callback`. Avec le domaine de production actuel, ce sera `https://listecadeaux-mauve.vercel.app/api/gmail/callback`. Utiliser le domaine principal du projet, pas une adresse temporaire de déploiement.
+10. Copier l’ID client et le secret client **uniquement dans les variables sécurisées Vercel**, jamais dans la conversation ou dans Git.
 
 ## Variables Vercel
 

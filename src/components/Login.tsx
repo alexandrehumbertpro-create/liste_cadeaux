@@ -48,6 +48,9 @@ export default function Login({ destination = "/" }: { destination?: string }) {
           {busy ? "Connexion…" : "Ouvrir mon carnet"}
         </button>
       </form>
+      <p>
+        <a href="/confidentialite">Confidentialité et connexion Gmail</a>
+      </p>
     </main>
   );
 }
