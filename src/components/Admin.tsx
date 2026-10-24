@@ -1,4 +1,7 @@
 "use client";
+import ActivityLog from "./ActivityLog";
+import ListShares from "./ListShares";
+import { listHistory } from "@/lib/list-history";
 import Brand from "@/components/Brand";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -557,6 +560,18 @@ export default function Admin({
                 <button onClick={() => setModal("share")}>Partager ↗</button>
                 <button
                   className="secondary"
+                  onClick={() => setModal("sharedWith")}
+                >
+                  Partagé avec ?
+                </button>
+                <button
+                  className="secondary"
+                  onClick={() => setModal("listHistory")}
+                >
+                  Historique
+                </button>
+                <button
+                  className="secondary"
                   onClick={() => setModal("duplicate")}
                 >
                   Dupliquer
@@ -573,15 +588,6 @@ export default function Admin({
                   Archiver
                 </button>
               </div>
-              <small>
-                {data.shares
-                  .filter((s) => s.list_id === currentList.id)
-                  .map(
-                    (s) =>
-                      s.contact_name + " · " + s.channel + " (partage préparé)",
-                  )
-                  .join(" / ")}
-              </small>
             </div>
           )}
           {(view === "lists" && !listId) || (view === "people" && !person) ? (
@@ -1611,6 +1617,31 @@ export default function Admin({
             preview={editingList && previews[editingList.id]}
             done={done}
           />
+        </Modal>
+      )}
+      {modal === "sharedWith" && currentList && (
+        <Modal title="Partagé avec ?" close={() => setModal("")}>
+          <ListShares list={currentList} data={data} />
+        </Modal>
+      )}
+      {modal === "listHistory" && currentList && (
+        <Modal
+          title={"Historique · " + currentList.name}
+          close={() => setModal("")}
+        >
+          <p>
+            Les changements de cette liste et de ses idées, du plus récent au
+            plus ancien.
+          </p>
+          <ActivityLog
+            entries={listHistory(data, currentList.id)}
+            data={data}
+          />
+          <small>
+            Le suivi détaillé des listes commence avec cette mise à jour. Les
+            événements plus anciens déjà enregistrés sont conservés ; leur
+            rattachement utilise les listes connues à cette date.
+          </small>
         </Modal>
       )}
       {modal === "share" && currentList && (

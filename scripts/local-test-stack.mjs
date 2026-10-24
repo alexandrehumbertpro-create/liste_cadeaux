@@ -184,6 +184,15 @@ await sql.query(
     "utf8",
   ),
 );
+await sql.query(
+  await readFile(
+    new URL(
+      "../supabase/migrations/202610240003_list_history.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 
 await sql.end();
 await writeFile(

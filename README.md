@@ -115,3 +115,9 @@ Vérification locale supplémentaire : `TEST_APP_URL=http://localhost:3000 node 
 ### Migration des couleurs partagées
 
 Sur un projet existant, exécuter `supabase/migrations/202610240002_shared_recipient_colors.sql` avant de déployer ce changement. Les couleurs précédentes d’Alex sont reprises en priorité ; si Alex n’en avait pas choisi, celles d’Elise sont conservées. Les autres préférences restent personnelles.
+
+### Partages et historique d’une liste
+
+Appliquer `supabase/migrations/202610240003_list_history.sql` avant de publier cette version. Dans une liste administrateur, « Partagé avec ? » remplace les contacts affichés sous les boutons. Il montre le nom, le canal, la date et l’auteur de chaque partage préparé ; une copie de lien n’identifie pas les destinataires et un partage préparé ne prouve pas son envoi.
+
+« Historique » recense la création, la modification et l’archivage des listes, les ajouts/retraits et changements des idées (prix, priorité, destinataire, réservation, etc.) et les partages préparés. Les listes associées sont enregistrées au moment de chaque changement, afin de garder les retraits visibles. La confidentialité actuelle de l’idée est contrôlée par les règles Supabase : les événements d’une idée privée ne sont visibles que par son propriétaire. Le nom des invités reste masqué. Les anciens événements déjà présents sont rattachés selon les listes connues au moment de la migration ; les changements jamais enregistrés ne peuvent pas être reconstitués.

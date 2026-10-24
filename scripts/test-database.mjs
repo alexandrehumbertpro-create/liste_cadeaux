@@ -199,6 +199,63 @@ try {
       );
     },
   );
+  const legacyList = (
+    await admin(
+      alex,
+      "insert into lists(name,created_by) values('Liste avant historique',$1) returning id",
+      [alex],
+    )
+  ).rows[0].id;
+  const legacyIdea = (
+    await admin(
+      alex,
+      "insert into ideas(title,owner_id,candidates) values('Idée antérieure',$1,array[$2::uuid]) returning id",
+      [alex, recipient],
+    )
+  ).rows[0].id;
+  await admin(
+    alex,
+    "insert into proposals(idea_id,recipient_id,list_ids) values($1,$2,array[$3::uuid])",
+    [legacyIdea, recipient, legacyList],
+  );
+  await admin(alex, "update ideas set price_min=12 where id=$1", [legacyIdea]);
+  await admin(
+    elise,
+    "insert into share_history(list_id,created_by,contact_name,channel) values($1,$2,'Contact antérieur','sms')",
+    [legacyList, elise],
+  );
+  await db.query(
+    await readFile(
+      new URL(
+        "../supabase/migrations/202610240003_list_history.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await check(
+    "La migration conserve les anciens changements et partages avec leur date et leur auteur",
+    async () => {
+      const changes = (
+        await admin(
+          alex,
+          "select * from activity where $1=any(list_ids) and idea_id=$2",
+          [legacyList, legacyIdea],
+        )
+      ).rows;
+      assert.ok(changes.some((a) => a.changes.price_min?.after === 12));
+      const shares = (
+        await admin(
+          alex,
+          "select * from activity where $1=any(list_ids) and message='Partage préparé'",
+          [legacyList],
+        )
+      ).rows;
+      assert.equal(shares.length, 1);
+      assert.equal(shares[0].actor_id, elise);
+      assert.equal(shares[0].changes.contact_name.after, "Contact antérieur");
+    },
+  );
   const list = (
     await admin(
       alex,
@@ -958,6 +1015,208 @@ try {
         admin(alex, "select * from claim_email_jobs_for_provider('gmail')"),
         /permission denied/,
       );
+    },
+  );
+  await check(
+    "L’historique suit les modifications de liste et leur auteur sans événements vides",
+    async () => {
+      const id = (
+        await admin(
+          alex,
+          "insert into lists(name,created_by) values('Historique',$1) returning id",
+          [alex],
+        )
+      ).rows[0].id;
+      await admin(
+        elise,
+        "update lists set name='Historique modifié',slogan='Bienvenue' where id=$1",
+        [id],
+      );
+      const event = (
+        await admin(
+          alex,
+          "select * from activity where $1=any(list_ids) and message='Liste modifiée' order by id desc",
+          [id],
+        )
+      ).rows[0];
+      assert.equal(event.actor_id, elise);
+      assert.equal(event.changes.name.before, "Historique");
+      assert.equal(event.changes.name.after, "Historique modifié");
+      const count = (
+        await db.query(
+          "select count(*)::int n from activity where $1=any(list_ids)",
+          [id],
+        )
+      ).rows[0].n;
+      await admin(elise, "update lists set name=name where id=$1", [id]);
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from activity where $1=any(list_ids)",
+            [id],
+          )
+        ).rows[0].n,
+        count,
+      );
+    },
+  );
+  await check(
+    "Le prix, la priorité et le retrait d’une idée conservent la portée historique des listes",
+    async () => {
+      const pid = await make();
+      const iid = (
+        await db.query("select idea_id from proposals where id=$1", [pid])
+      ).rows[0].idea_id;
+      const other = (
+        await admin(
+          alex,
+          "insert into lists(name,created_by) values('Autre liste',$1) returning id",
+          [alex],
+        )
+      ).rows[0].id;
+      await admin(elise, "update ideas set price_min=40 where id=$1", [iid]);
+      const price = (
+        await admin(
+          alex,
+          "select * from activity where idea_id=$1 and changes ? 'price_min' order by id desc",
+          [iid],
+        )
+      ).rows[0];
+      assert.ok(price.list_ids.includes(list.id));
+      assert.equal(price.actor_id, elise);
+      assert.equal(Number(price.changes.price_min.before), 30);
+      assert.equal(Number(price.changes.price_min.after), 40);
+      await admin(
+        elise,
+        "update proposals set priority=1,list_ids=array[$2::uuid] where id=$1",
+        [pid, other],
+      );
+      const moved = (
+        await db.query(
+          "select * from activity where idea_id=$1 and changes ? 'list_ids' order by id desc",
+          [iid],
+        )
+      ).rows[0];
+      assert.ok(moved.list_ids.includes(list.id));
+      assert.ok(moved.list_ids.includes(other));
+      assert.deepEqual(moved.changes.priority, { before: 0, after: 1 });
+      await admin(alex, "update ideas set price_min=50 where id=$1", [iid]);
+      const latest = (
+        await db.query(
+          "select * from activity where idea_id=$1 and changes ? 'price_min' order by id desc",
+          [iid],
+        )
+      ).rows[0];
+      assert.deepEqual(latest.list_ids, [other]);
+    },
+  );
+  await check(
+    "L’historique d’une idée devenue privée reste inaccessible à Elise et aux visiteurs",
+    async () => {
+      const pid = await make();
+      const iid = (
+        await db.query("select idea_id from proposals where id=$1", [pid])
+      ).rows[0].idea_id;
+      await admin(
+        alex,
+        "update ideas set visibility='private',title='HISTORIQUE_CONFIDENTIEL' where id=$1",
+        [iid],
+      );
+      assert.ok(
+        (await admin(alex, "select * from activity where idea_id=$1", [iid]))
+          .rows.length,
+      );
+      assert.equal(
+        (await admin(elise, "select * from activity where idea_id=$1", [iid]))
+          .rows.length,
+        0,
+      );
+      assert.equal(
+        (
+          await admin(
+            outsider,
+            "select * from activity where $1=any(list_ids)",
+            [list.id],
+          )
+        ).rows.length,
+        0,
+      );
+      await assert.rejects(
+        admin(elise, "select history_idea_lists($1)", [iid]),
+        /permission denied/,
+      );
+    },
+  );
+  await check(
+    "Un partage préparé conserve le contact, le canal, la liste et l’auteur",
+    async () => {
+      await admin(
+        elise,
+        "insert into share_history(list_id,created_by,contact_name,channel) values($1,$2,'Sophie et Marc','whatsapp')",
+        [list.id, elise],
+      );
+      const entry = (
+        await admin(
+          alex,
+          "select * from activity where $1=any(list_ids) and message='Partage préparé' order by id desc",
+          [list.id],
+        )
+      ).rows[0];
+      assert.equal(entry.actor_id, elise);
+      assert.equal(entry.changes.contact_name.after, "Sophie et Marc");
+      assert.equal(entry.changes.channel.after, "whatsapp");
+    },
+  );
+  await check(
+    "Une réservation invitée figure dans l’historique sans divulguer son identité",
+    async () => {
+      const pid = await make();
+      const iid = (
+        await db.query("select idea_id from proposals where id=$1", [pid])
+      ).rows[0].idea_id;
+      await db.query(
+        "select reserve_gift($1,$2,'NOM_SECRET','secret@example.test',null)",
+        [list.share_token, pid],
+      );
+      const entry = (
+        await admin(
+          alex,
+          "select * from activity where idea_id=$1 and message='Idée réservée' order by id desc",
+          [iid],
+        )
+      ).rows[0];
+      assert.ok(entry.list_ids.includes(list.id));
+      assert.equal(entry.actor_id, null);
+      assert.equal(entry.changes.reserved.after, true);
+      assert.ok(!JSON.stringify(entry).includes("NOM_SECRET"));
+      assert.ok(!JSON.stringify(entry).includes("secret@example.test"));
+    },
+  );
+  await check(
+    "Une proposition non classée n’ajoute pas d’événement à la liste d’une autre proposition",
+    async () => {
+      const pid = await make();
+      const iid = (
+        await db.query("select idea_id from proposals where id=$1", [pid])
+      ).rows[0].idea_id;
+      const second = (
+        await admin(
+          alex,
+          "insert into proposals(idea_id,recipient_id) values($1,$2) returning id",
+          [iid, recipient],
+        )
+      ).rows[0].id;
+      await admin(alex, "update proposals set priority=1 where id=$1", [
+        second,
+      ]);
+      const latest = (
+        await db.query(
+          "select * from activity where idea_id=$1 order by id desc limit 1",
+          [iid],
+        )
+      ).rows[0];
+      assert.equal(latest.message, "Paramètres de l’idée modifiés");
+      assert.deepEqual(latest.list_ids, []);
     },
   );
   console.log(`${checks} vérifications PostgreSQL réussies.`);

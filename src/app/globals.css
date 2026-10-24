@@ -1137,3 +1137,45 @@ button,
   height: 80px;
   object-fit: contain;
 }
+
+.activity-log,
+.share-history {
+  list-style: none;
+  padding: 0;
+}
+.activity-log > li,
+.share-history > li {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.activity-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.activity-meta time {
+  color: var(--muted);
+}
+.activity-log h3 {
+  margin: 10px 0 6px;
+  font-size: 17px;
+}
+.activity-log ul {
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.activity-idea {
+  color: var(--blue);
+  font-weight: 700;
+}
+.share-history > li {
+  display: grid;
+  gap: 6px;
+}
+.share-history span {
+  font-size: 14px;
+}

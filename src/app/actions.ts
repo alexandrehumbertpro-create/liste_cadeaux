@@ -322,6 +322,7 @@ export async function recordShare(
       channel: z.enum(["whatsapp", "gmail", "sms"]).parse(channel),
     });
     if (error) throw new Error(error.message);
+    revalidatePath("/");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: message(e) };

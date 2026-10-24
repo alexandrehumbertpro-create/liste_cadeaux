@@ -54,6 +54,7 @@ export type Profile = {
   preferences: Record<string, unknown>;
 };
 export type Activity = {
+  list_ids?: string[];
   id: number;
   idea_id: string | null;
   actor_id: string | null;
@@ -72,6 +73,8 @@ export type Dataset = {
   profiles: Profile[];
   activity: Activity[];
   shares: {
+    id?: string;
+    created_by?: string;
     list_id: string;
     contact_name: string;
     channel: string;
