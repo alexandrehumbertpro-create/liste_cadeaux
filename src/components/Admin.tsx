@@ -1370,10 +1370,7 @@ export default function Admin({
       {voiceOpen && (
         <VoiceIdea
           recipients={personalOrder(data.recipients, { ...prefs, order })}
-          defaultRecipientId={person || undefined}
-          defaultList={data.lists.find(
-            (l) => l.id === listId && !l.archived_at,
-          )}
+          lists={data.lists}
           close={() => setVoiceOpen(false)}
           saved={setNotice}
         />

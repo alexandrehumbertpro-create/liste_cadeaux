@@ -9,26 +9,11 @@ import {
   voiceGiftInput,
   type VoiceIdea as Draft,
 } from "@/lib/voice-idea";
-import type { Recipient } from "@/lib/types";
+import type { Recipient, GiftList } from "@/lib/types";
+import { createDictation, type Recognition } from "@/lib/dictation";
 import { recipientStyle } from "@/lib/recipient-colors";
 import Modal from "./Modal";
 
-type SpeechResult = {
-  isFinal: boolean;
-  0: { transcript: string; confidence: number };
-};
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onresult: ((event: { results: ArrayLike<SpeechResult> }) => void) | null;
-  onerror: ((event: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
 type SpeechWindow = Window & {
   SpeechRecognition?: new () => Recognition;
   webkitSpeechRecognition?: new () => Recognition;
@@ -45,14 +30,12 @@ const priorityNames = ["Coup de cœur", "Idée prioritaire", "Idée"];
 
 export default function VoiceIdea({
   recipients,
-  defaultRecipientId,
-  defaultList,
+  lists,
   close,
   saved,
 }: {
   recipients: Recipient[];
-  defaultRecipientId?: string;
-  defaultList?: { id: string; name: string };
+  lists: GiftList[];
   close: () => void;
   saved: (notice: string) => void;
 }) {
@@ -63,7 +46,7 @@ export default function VoiceIdea({
   const [questions, setQuestions] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [session, setSession] = useState(0);
-  const recognition = useRef<Recognition | null>(null);
+  const dictation = useRef<ReturnType<typeof createDictation> | null>(null);
   const alive = useRef(false);
   const saving = useRef(false);
   const phaseRef = useRef<Phase>("listening");
@@ -72,7 +55,7 @@ export default function VoiceIdea({
 
   async function store(idea: Draft) {
     if (saving.current || !alive.current) return;
-    const payload = voiceGiftInput(idea, defaultList?.id);
+    const payload = voiceGiftInput(idea);
     const checked = giftInput.safeParse(payload);
     const invalidCommon =
       idea.candidates.length > 1 &&
@@ -120,12 +103,6 @@ export default function VoiceIdea({
 
   useEffect(() => {
     alive.current = true;
-    let disposed = false;
-    let failed = false;
-    let handled = false;
-    let finalText = "";
-    let heard = "";
-    let doubtful = false;
     const Speech =
       (window as SpeechWindow).SpeechRecognition ??
       (window as SpeechWindow).webkitSpeechRecognition;
@@ -135,90 +112,56 @@ export default function VoiceIdea({
         alive.current = false;
       };
     }
-    const rec = new Speech();
-    recognition.current = rec;
-    rec.lang = "fr-FR";
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.maxAlternatives = 1;
     setPhase("listening");
     setError("");
     setTranscript("");
-    rec.onresult = ({ results }) => {
-      if (disposed || handled || failed) return;
-      const all = Array.from(results);
-      finalText = all
-        .filter((r) => r.isFinal)
-        .map((r) => r[0].transcript)
-        .join(" ")
-        .trim();
-      heard = all
-        .map((r) => r[0].transcript)
-        .join(" ")
-        .trim();
-      doubtful = all.some(
-        (r) => r.isFinal && r[0].confidence > 0 && r[0].confidence < 0.65,
-      );
-      setTranscript(heard);
-    };
-    rec.onerror = ({ error: code }) => {
-      if (disposed || handled) return;
-      failed = true;
-      const messages: Record<string, string> = {
-        "not-allowed":
-          "Autorisez le microphone dans les paramètres de votre navigateur, puis réessayez.",
-        "service-not-allowed":
-          "La dictée est bloquée par ce navigateur. Essayez Safari sur iPhone ou Chrome sur Android.",
-        "audio-capture":
-          "Aucun microphone disponible. Vérifiez qu’il n’est pas utilisé par une autre application.",
-        "no-speech":
-          "Je n’ai rien entendu. Réessayez en parlant près du microphone.",
-        network:
-          "Le service de dictée est indisponible. Vérifiez votre connexion et réessayez.",
-        aborted: "Dictée interrompue. Aucune idée n’a été ajoutée.",
-      };
-      setError(
-        messages[code] ??
-          "La dictée n’a pas abouti. Aucune idée n’a été ajoutée.",
-      );
-      setPhase("error");
-    };
-    rec.onend = () => {
-      if (disposed || handled || failed) return;
-      handled = true;
-      const text = finalText || heard;
-      if (!text) {
-        setPhase("error");
-        setError("Je n’ai rien entendu. Aucune idée n’a été ajoutée.");
-        return;
-      }
-      setTranscript(text);
-      const parsed = parseVoiceIdea(text, recipients, defaultRecipientId);
-      if (doubtful || !finalText)
-        parsed.questions.unshift(
-          "Ai-je bien entendu ? Vérifiez l’idée ou dictez-la à nouveau.",
+    const capture = createDictation({
+      create: () => new Speech(),
+      onText: setTranscript,
+      onError: (code) => {
+        const messages: Record<string, string> = {
+          "not-allowed":
+            "Autorisez le microphone dans les paramètres de votre navigateur, puis reprenez la dictée.",
+          "service-not-allowed":
+            "La dictée est bloquée par ce navigateur. Essayez Safari sur iPhone ou Chrome sur Android.",
+          "audio-capture":
+            "Aucun microphone disponible. Vérifiez qu’il n’est pas utilisé par une autre application.",
+          network:
+            "Le service de dictée est indisponible. Votre texte est conservé ; vérifiez votre connexion puis reprenez.",
+          aborted:
+            "L’écoute a été interrompue. Votre texte est conservé ; vous pouvez reprendre.",
+        };
+        setError(
+          messages[code] ??
+            "L’écoute s’est interrompue. Votre texte est conservé ; touchez Reprendre la dictée.",
         );
-      setDraft(parsed.idea);
-      setQuestions(parsed.questions);
-      if (parsed.questions.length) setPhase("review");
-      else void store(parsed.idea);
-    };
-    try {
-      rec.start();
-    } catch {
-      setPhase("error");
-      setError(
-        "Impossible de démarrer la dictée. Vérifiez l’autorisation du microphone et réessayez.",
-      );
-    }
+        setPhase("error");
+      },
+      onFinish: (text, doubtful) => {
+        if (!text) {
+          setPhase("error");
+          setError("Je n’ai rien entendu. Aucune idée n’a été ajoutée.");
+          return;
+        }
+        const parsed = parseVoiceIdea(text, recipients, lists);
+        if (doubtful)
+          parsed.questions.unshift(
+            "Ai-je bien entendu ? Vérifiez l’idée ou dictez-la à nouveau.",
+          );
+        setDraft(parsed.idea);
+        setQuestions(parsed.questions);
+        if (parsed.questions.length) setPhase("review");
+        else void store(parsed.idea);
+      },
+    });
+    dictation.current = capture;
+    capture.start();
     return () => {
-      disposed = true;
       alive.current = false;
-      rec.onresult = rec.onerror = rec.onend = null;
-      rec.abort();
-      recognition.current = null;
+      capture.cancel();
+      dictation.current = null;
     };
-    // A recognition session must not restart when a background refresh updates people.
+    // Background refreshes must not restart a live dictation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
@@ -241,9 +184,9 @@ export default function VoiceIdea({
           60 euros ».
         </p>
         <p className="muted voice-hint">
-          Public par défaut · Sans personne indiquée :{" "}
-          {people.find((p) => p.id === defaultRecipientId)?.name ?? "À classer"}
-          .
+          Seuls les détails dictés sont repris. Sans personne ni liste : À
+          classer. Sans visibilité précisée : Public, le réglage habituel du
+          carnet.
         </p>
         {phase === "listening" && (
           <>
@@ -252,9 +195,9 @@ export default function VoiceIdea({
             </p>
             <p className="voice-transcript" aria-live="polite">
               {transcript ||
-                "Parlez, puis marquez une pause pour ajouter l’idée."}
+                "Prenez votre temps. Rien ne sera ajouté avant « Terminer la dictée »."}
             </p>
-            <button type="button" onClick={() => recognition.current?.stop()}>
+            <button type="button" onClick={() => dictation.current?.finish()}>
               <Square size={16} aria-hidden="true" /> Terminer la dictée
             </button>
           </>
@@ -340,6 +283,59 @@ export default function VoiceIdea({
                 ))}
               </div>
             </fieldset>
+            <fieldset>
+              <legend>Listes</legend>
+              <div className="voice-people">
+                <button
+                  type="button"
+                  className="secondary"
+                  aria-pressed={!draft.listIds.length}
+                  onClick={() => setDraft({ ...draft, listIds: [] })}
+                >
+                  Aucune liste
+                </button>
+                {lists
+                  .filter((l) => !l.archived_at)
+                  .map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      className="secondary"
+                      aria-pressed={draft.listIds.includes(l.id)}
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          listIds: draft.listIds.includes(l.id)
+                            ? draft.listIds.filter((id) => id !== l.id)
+                            : [...draft.listIds, l.id],
+                        })
+                      }
+                    >
+                      {draft.listIds.includes(l.id) ? "✓ " : ""}
+                      {l.name}
+                    </button>
+                  ))}
+              </div>
+            </fieldset>
+            {(
+              [
+                ["description", "Description"],
+                ["specifications", "Précisions publiques"],
+                ["privateNote", "Note privée"],
+              ] as const
+            )
+              .filter(([key]) => draft[key])
+              .map(([key, label]) => (
+                <label key={key}>
+                  {label}
+                  <textarea
+                    value={draft[key]}
+                    onChange={(e) =>
+                      setDraft({ ...draft, [key]: e.target.value })
+                    }
+                  />
+                </label>
+              ))}
             <div className="voice-fields">
               <label>
                 Prix / budget (€)
@@ -380,11 +376,17 @@ export default function VoiceIdea({
               <label>
                 Priorité
                 <select
-                  value={draft.priority}
+                  aria-label="Priorité"
+                  value={draft.priority ?? ""}
                   onChange={(e) =>
-                    setDraft({ ...draft, priority: Number(e.target.value) })
+                    setDraft({
+                      ...draft,
+                      priority:
+                        e.target.value === "" ? null : Number(e.target.value),
+                    })
                   }
                 >
+                  <option value="">Non précisée</option>
                   {priorityNames.map((p, i) => (
                     <option value={i} key={p}>
                       {p}
@@ -395,14 +397,17 @@ export default function VoiceIdea({
               <label>
                 Visibilité
                 <select
-                  value={draft.visibility}
+                  aria-label="Visibilité"
+                  value={draft.visibility ?? ""}
                   onChange={(e) =>
                     setDraft({
                       ...draft,
-                      visibility: e.target.value as Draft["visibility"],
+                      visibility: (e.target.value ||
+                        null) as Draft["visibility"],
                     })
                   }
                 >
+                  <option value="">Non précisée (Public par défaut)</option>
                   <option value="public">Public</option>
                   <option value="household">Nous deux</option>
                   <option value="private">Moi uniquement</option>
@@ -424,31 +429,77 @@ export default function VoiceIdea({
               <strong>{draft.title}</strong>
             </p>
             <p>
-              Pour :{" "}
-              {draft.candidates.length
-                ? draft.candidates
-                    .map((id) => people.find((p) => p.id === id)?.name)
-                    .join(", ")
-                : "À classer"}
-              <br />
-              {draft.priceMin !== null && (
-                <>{formatPrice(draft.priceMin, draft.priceMax)} · </>
-              )}
-              {priorityNames[draft.priority]}
-              <br />
-              Visibilité :{" "}
-              {
-                {
-                  public: "Public",
-                  household: "Nous deux",
-                  private: "Moi uniquement",
-                }[draft.visibility]
-              }
-              {defaultList && (
+              {draft.candidates.length > 0 && (
                 <>
+                  Pour :{" "}
+                  {draft.candidates
+                    .map((id) => people.find((p) => p.id === id)?.name)
+                    .join(", ")}
                   <br />
-                  Liste : {defaultList.name}
                 </>
+              )}
+              {draft.listIds.length > 0 && (
+                <>
+                  Listes :{" "}
+                  {draft.listIds
+                    .map((id) => lists.find((l) => l.id === id)?.name)
+                    .join(", ")}
+                  <br />
+                </>
+              )}
+              {!draft.candidates.length && (
+                <>
+                  À classer
+                  <br />
+                </>
+              )}
+              {draft.priceMin !== null && (
+                <>
+                  {formatPrice(draft.priceMin, draft.priceMax)}
+                  <br />
+                </>
+              )}
+              {draft.priority !== null && (
+                <>
+                  {priorityNames[draft.priority]}
+                  <br />
+                </>
+              )}
+              {draft.visibility !== null && (
+                <>
+                  Visibilité :{" "}
+                  {
+                    {
+                      public: "Public",
+                      household: "Nous deux",
+                      private: "Moi uniquement",
+                    }[draft.visibility]
+                  }
+                  <br />
+                </>
+              )}
+              {draft.description && (
+                <>
+                  Description : {draft.description}
+                  <br />
+                </>
+              )}
+              {draft.specifications && (
+                <>
+                  Précisions : {draft.specifications}
+                  <br />
+                </>
+              )}
+              {draft.privateNote && (
+                <>
+                  Note privée : {draft.privateNote}
+                  <br />
+                </>
+              )}
+              {draft.url && (
+                <a href={draft.url} target="_blank" rel="noreferrer">
+                  Lien produit
+                </a>
               )}
             </p>
             <button type="button" onClick={close}>
@@ -459,8 +510,31 @@ export default function VoiceIdea({
         {phase === "error" && (
           <>
             <p className="voice-transcript">{transcript}</p>
-            <button type="button" onClick={retry}>
-              🎤 Réessayer
+            <button
+              type="button"
+              onClick={() => {
+                if (!transcript) {
+                  retry();
+                  return;
+                }
+                setError("");
+                setPhase("listening");
+                dictation.current?.start();
+              }}
+            >
+              🎤 Reprendre la dictée
+            </button>
+            {transcript && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => dictation.current?.finish()}
+              >
+                Terminer avec ce texte
+              </button>
+            )}
+            <button type="button" className="secondary" onClick={retry}>
+              Recommencer
             </button>
           </>
         )}

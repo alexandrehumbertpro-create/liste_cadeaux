@@ -25,6 +25,26 @@ const profile = {
   display_name: "Alex",
   preferences: {},
 };
+const lists = [
+  {
+    id: randomUUID(),
+    name: "Noël",
+    archived_at: null,
+    share_token: randomUUID(),
+    created_at: "2026-01-01",
+    image_url: null,
+    slogan: "",
+  },
+  {
+    id: randomUUID(),
+    name: "Anniversaire",
+    archived_at: null,
+    share_token: randomUUID(),
+    created_at: "2026-01-01",
+    image_url: null,
+    slogan: "",
+  },
+];
 const records = [];
 const routes = [];
 let failSave = false;
@@ -58,7 +78,7 @@ const api = createServer(async (req, res) => {
     recipients,
     ideas: [],
     proposals: [],
-    lists: [],
+    lists,
     activity: [],
     share_history: [],
   }[table];
@@ -192,15 +212,30 @@ try {
     );
   }
   await p.setViewportSize({ width: 390, height: 900 });
-  // Clear speech is saved once, without an extra confirmation.
+  // Natural browser pauses must never save; explicit Finish submits all cycles.
   await p.getByRole("button", { name: "Dicter une idée", exact: true }).click();
   await expect(p.getByText("Je vous écoute…", { exact: true })).toBeVisible();
   await p.evaluate(() => {
-    window.testSpeech.finish(
-      "Ajoute un atelier de céramique pour Elise à 60 euros",
-    );
-    window.testSpeech.onend?.();
+    window.testFirst = window.testSpeech;
+    window.testSpeech.finish("Ajoute un atelier de céramique");
   });
+  await p.waitForFunction(() => window.testSpeech !== window.testFirst);
+  assert.equal(records.length, 0);
+  await expect(p.getByText("Je vous écoute…", { exact: true })).toBeVisible();
+  await p.evaluate(() => {
+    window.testFirst = window.testSpeech;
+    window.testSpeech.finish("pour Elise");
+  });
+  await p.waitForFunction(() => window.testSpeech !== window.testFirst);
+  assert.equal(records.length, 0);
+  await p.evaluate(() =>
+    window.testSpeech.emit(
+      "dans les listes Noël et Anniversaire à soixante euros priorité haute visibilité nous deux",
+    ),
+  );
+  await p
+    .getByRole("button", { name: "Terminer la dictée", exact: true })
+    .click();
   await expect(
     p.getByRole("heading", { name: "✓ Idée ajoutée" }),
   ).toBeVisible();
@@ -208,15 +243,30 @@ try {
   assert.equal(records[0].title, "un atelier de céramique");
   assert.deepEqual(records[0].candidates, [recipients[1].id]);
   assert.equal(records[0].priceMin, 60);
+  assert.deepEqual(
+    records[0].listIds,
+    lists.map((l) => l.id),
+  );
+  assert.equal(records[0].priority, 1);
+  assert.equal(records[0].visibility, "household");
   await p.getByRole("button", { name: "Terminé", exact: true }).click();
   await expect(
     p.getByRole("button", { name: "Dicter une idée", exact: true }),
   ).toBeFocused();
   // Unknown name asks for precision, never falls back to the current person.
   await p.getByRole("button", { name: "Dicter une idée", exact: true }).click();
-  await p.evaluate(() => window.testSpeech.finish("Une lampe pour Alice"));
+  await p.evaluate(() =>
+    window.testSpeech.emit("Une lampe pour Alice dans la liste Vacances"),
+  );
+  await p
+    .getByRole("button", { name: "Terminer la dictée", exact: true })
+    .click();
   await expect(p.getByText(/Pour qui est cette idée/)).toBeVisible();
   assert.equal(records.length, 1);
+  await expect(p.getByText(/Quelle liste/)).toBeVisible();
+  await expect(p.getByLabel("Priorité", { exact: true })).toHaveValue("");
+  await expect(p.getByLabel("Visibilité", { exact: true })).toHaveValue("");
+  await p.getByRole("button", { name: "Noël", exact: true }).click();
   await p.getByRole("button", { name: "Élise", exact: true }).click();
   await p
     .getByRole("button", { name: "Ajouter cette idée", exact: true })
@@ -228,14 +278,20 @@ try {
   await p.getByRole("button", { name: "Terminé", exact: true }).click();
   // Low recognition confidence requests a check; re-dictating starts clean.
   await p.getByRole("button", { name: "Dicter une idée", exact: true }).click();
-  await p.evaluate(() => window.testSpeech.finish("Un livre pour Alex", 0.3));
+  await p.evaluate(() => window.testSpeech.emit("Un livre pour Alex", 0.3));
+  await p
+    .getByRole("button", { name: "Terminer la dictée", exact: true })
+    .click();
   await expect(p.getByText(/Ai-je bien entendu/)).toBeVisible();
   assert.equal(records.length, 2);
   await p.getByRole("button", { name: "🎤 Redicter", exact: true }).click();
   await expect(p.getByText("Je vous écoute…", { exact: true })).toBeVisible();
   await p.evaluate(() =>
-    window.testSpeech.finish("Un livre pour Alex moi uniquement"),
+    window.testSpeech.emit("Un livre pour Alex moi uniquement"),
   );
+  await p
+    .getByRole("button", { name: "Terminer la dictée", exact: true })
+    .click();
   await expect(
     p.getByRole("heading", { name: "✓ Idée ajoutée" }),
   ).toBeVisible();
@@ -261,7 +317,10 @@ try {
   // Unknown save outcome is never blindly retried.
   failSave = true;
   await p.getByRole("button", { name: "Dicter une idée", exact: true }).click();
-  await p.evaluate(() => window.testSpeech.finish("Un vélo pour Alex"));
+  await p.evaluate(() => window.testSpeech.emit("Un vélo pour Alex"));
+  await p
+    .getByRole("button", { name: "Terminer la dictée", exact: true })
+    .click();
   await expect(p.getByRole("dialog").getByRole("alert")).toContainText(
     "vérifiez dans Mes idées",
   );
@@ -284,7 +343,7 @@ try {
     p.getByRole("heading", { name: "Une nouvelle idée", exact: true }),
   ).toBeVisible();
   console.log(
-    "PASS: microphone placement at 320/390/1440, direct add once, recipient clarification, low confidence, private idea, Escape cancellation, focus restoration, denied/unsupported microphone, uncertain-save guard, manual form preserved.",
+    "PASS: microphone placement at 320/390/1440, explicit-finish only across pauses, all dictated fields and lists, no inferred fields, recipient/list clarification, low confidence, private idea, Escape cancellation, focus restoration, denied/unsupported microphone, uncertain-save guard, manual form preserved.",
   );
 } catch (e) {
   console.error(logs, routes, { saves: records.length });
