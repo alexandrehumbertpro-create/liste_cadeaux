@@ -70,3 +70,26 @@ it("le partage rapide ne contient jamais la note de gestion ni le nom du réserv
   expect(text).toContain("40–60 €");
   expect(text).not.toContain("SECRET");
 });
+
+it("adresse un seul message aux deux administrateurs et sécurise le Reply-To", () => {
+  const message = gmailMessage(
+    "alex@example.test",
+    ["alex@example.test", "elise@example.test"],
+    "Question",
+    "html",
+    undefined,
+    "guest@example.test",
+  );
+  expect(message).toContain("To: alex@example.test, elise@example.test\r\n");
+  expect(message).toContain("Reply-To: guest@example.test\r\n");
+  expect(() =>
+    gmailMessage(
+      "alex@example.test",
+      ["elise@example.test"],
+      "Question",
+      "html",
+      undefined,
+      "guest@example.test\r\nBcc: intrus@example.test",
+    ),
+  ).toThrow();
+});

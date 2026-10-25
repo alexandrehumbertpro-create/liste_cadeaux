@@ -13,6 +13,7 @@ import {
   giftInput,
   reservationInput,
   adminReservationInput,
+  giftQuestionInput,
   imageReference,
 } from "@/lib/validation";
 import { drainEmails, transactionalSenderId } from "@/lib/mail";
@@ -31,6 +32,9 @@ function message(error: unknown) {
     private_notification_forbidden:
       "Une idée privée ne peut pas être envoyée à l’autre administrateur.",
     recipient_not_found: "Personne introuvable.",
+    invalid_question: "Vérifiez votre nom, votre email et votre question.",
+    question_recipients_missing:
+      "Les destinataires ne sont pas encore configurés. Réessayez plus tard.",
     invalid_guest:
       "Indiquez un nom et une adresse email valide si vous en renseignez une.",
     invalid_color: "Choisissez une couleur valide.",
@@ -335,7 +339,7 @@ export async function recordShare(
     return { ok: false, error: message(e) };
   }
 }
-async function throttle(scope: string) {
+async function throttle(scope: string, maxRequests = 15) {
   const h = await headers();
   const ip =
     h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -346,7 +350,7 @@ async function throttle(scope: string) {
     .digest("hex");
   const { data, error } = await serviceClient().rpc("rate_limit", {
     request_key: key,
-    max_requests: 15,
+    max_requests: maxRequests,
     window_seconds: 600,
   });
   if (error || !data)
@@ -377,6 +381,44 @@ export async function reserveGift(
       error:
         e instanceof z.ZodError
           ? "Vérifiez votre nom, email et montant."
+          : message(e),
+    };
+  }
+}
+export async function askGiftQuestion(
+  input: unknown,
+): Promise<Result<{ sent: boolean }>> {
+  try {
+    const v = giftQuestionInput.parse(input);
+    await throttle("gift-question", 5);
+    const db = serviceClient();
+    const { data: jobId, error } = await db.rpc("submit_gift_question", {
+      token: v.token,
+      gift: v.gift,
+      guest_name: v.name,
+      guest_email: v.email,
+      question: v.question,
+    });
+    if (error) throw Error(error.message);
+    await drainEmails().catch(() => undefined);
+    const { data: job } = await db
+      .from("email_jobs")
+      .select("status")
+      .eq("id", jobId)
+      .single();
+    if (job?.status === "cancelled")
+      return {
+        ok: false,
+        error:
+          "Cette idée n’est plus partagée. Votre question n’a pas été envoyée.",
+      };
+    return { ok: true, data: { sent: job?.status === "sent" } };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof z.ZodError
+          ? "Indiquez votre nom, un email valide et votre question (2 000 caractères maximum)."
           : message(e),
     };
   }

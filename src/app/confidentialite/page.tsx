@@ -2,9 +2,8 @@ import Brand from "@/components/Brand";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Confidentialité — La Hotte Humbert / Appli cadeaux",
-  description:
-    "Données personnelles et connexion Gmail de La Hotte Humbert, également nommé Appli cadeaux dans Google.",
+  title: "Confidentialité — La Hotte Humbert",
+  description: "Données personnelles et connexion Gmail de La Hotte Humbert.",
 };
 
 export default function PrivacyPage() {
@@ -14,10 +13,10 @@ export default function PrivacyPage() {
         <Brand />
       </a>
       <h1>Confidentialité</h1>
-      <p>Dernière mise à jour : 24 octobre 2026.</p>
+      <p>Dernière mise à jour : 25 octobre 2026.</p>
       <p>
-        La Hotte Humbert, nommé « Appli cadeaux » sur l’écran de connexion
-        Google, est un carnet familial d’idées cadeaux géré par Alex et Elise.
+        La Hotte Humbert est un carnet familial d’idées cadeaux géré par Alex et
+        Elise.
       </p>
       <h2>Les données utilisées</h2>
       <p>
@@ -31,6 +30,13 @@ export default function PrivacyPage() {
         réservations et envoyer les confirmations, annulations et notifications
         demandées. Les administrateurs peuvent révéler l’identité des réservants
         ; celle-ci est masquée par défaut dans le carnet.
+      </p>
+      <p>
+        Si vous posez une question sur un cadeau, votre nom, votre email, votre
+        message et la référence du cadeau sont transmis ensemble à Alex et Elise
+        pour qu’ils puissent vous répondre directement par email. La question
+        est conservée dans la file de messages pour permettre son envoi et les
+        éventuels réessais.
       </p>
       <h2>La connexion Google et Gmail</h2>
       <p>

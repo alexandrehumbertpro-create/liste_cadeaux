@@ -2,10 +2,13 @@
 import Brand from "@/components/Brand";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { SharedList, SharedGift } from "@/lib/types";
-import { formatPrice, budgetOverlap } from "@/lib/validation";
-import { reserveGift } from "@/lib/client-actions";
+import type { SharedList } from "@/lib/types";
+import { formatPrice } from "@/lib/validation";
+import { recipientStyle } from "@/lib/recipient-colors";
+import { guestGifts, type GuestSort } from "@/lib/guest-view";
 import Modal from "./Modal";
+import GuestGiftDetails from "./GuestGiftDetails";
+import GuestReservation from "./GuestReservation";
 export default function Guest({
   list,
   token,
@@ -14,33 +17,38 @@ export default function Guest({
   token: string;
 }) {
   const router = useRouter();
-  const [person, setPerson] = useState(""),
+  const [people, setPeople] = useState<string[]>([]),
     [max, setMax] = useState(""),
     [status, setStatus] = useState(""),
     [priority, setPriority] = useState(""),
-    [gift, setGift] = useState<SharedGift | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
+    [sort, setSort] = useState<GuestSort>("priority"),
+    [detailId, setDetailId] = useState(""),
+    [reserveId, setReserveId] = useState(""),
     [success, setSuccess] = useState("");
   useEffect(() => {
     const id = setInterval(() => router.refresh(), 20000);
     return () => clearInterval(id);
   }, [router]);
-  const gifts = list.gifts
-    .filter(
-      (g) =>
-        (!person || g.recipientId === person) &&
-        (priority === "" || g.priority === Number(priority)) &&
-        budgetOverlap(g.priceMin, g.priceMax, null, max ? Number(max) : null) &&
-        (!status || (status === "reserved" ? g.reserved : !g.reserved)),
-    )
-    .sort(
-      (a, b) =>
-        Number(a.reserved) - Number(b.reserved) || a.priority - b.priority,
-    );
   const recipients = [
-    ...new Map(list.gifts.map((g) => [g.recipientId, g.recipient])).entries(),
+    ...new Map(
+      list.gifts.map((g) => [
+        g.recipientId,
+        { id: g.recipientId, name: g.recipient, color: g.recipientColor },
+      ]),
+    ).values(),
   ];
+  const activePeople = people.filter((id) =>
+    recipients.some((r) => r.id === id),
+  );
+  const gifts = guestGifts(list.gifts, {
+    people: activePeople,
+    max,
+    status,
+    priority,
+    sort,
+  });
+  const detail = list.gifts.find((g) => g.id === detailId),
+    reservation = list.gifts.find((g) => g.id === reserveId);
   return (
     <>
       <header className="topbar">
@@ -50,14 +58,15 @@ export default function Guest({
         <small>La liste qu’on vous a partagée</small>
       </header>
       <main className="guest">
-        <div className="guest-heading">
+        <div className="guest-heading compact-guest-heading">
+          <div className="guest-intro">
+            <h1>{list.name}</h1>
+            <p>{list.slogan || "Une petite attention, un grand sourire."}</p>
+            <small>Aucun compte nécessaire pour réserver.</small>
+          </div>
           {list.imageUrl && (
             <img src={list.imageUrl} alt="Couverture de la liste" />
           )}
-          <p className="eyebrow">POUR LES ÂMES EN PANNE D’INSPIRATION</p>
-          <h1>{list.name}</h1>
-          <p>{list.slogan || "Une petite attention, un grand sourire."}</p>
-          <small>Aucun compte nécessaire pour réserver.</small>
         </div>
         {list.archived ? (
           <p className="notice">
@@ -65,37 +74,57 @@ export default function Guest({
           </p>
         ) : (
           <>
-            <div className="filter-grid filters">
-              <label>
-                Pour qui ?
-                <select
-                  value={person}
-                  onChange={(e) => setPerson(e.target.value)}
+            <fieldset className="guest-people">
+              <legend>Pour qui ?</legend>
+              <div className="chips">
+                <button
+                  className={"chip " + (!activePeople.length ? "selected" : "")}
+                  aria-pressed={!activePeople.length}
+                  onClick={() => setPeople([])}
                 >
-                  <option value="">Tout le monde</option>
-                  {recipients.map(([id, name]) => (
-                    <option value={id} key={id}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  Tout le monde
+                </button>
+                {recipients.map((p) => (
+                  <button
+                    key={p.id}
+                    className={
+                      "chip " + (activePeople.includes(p.id) ? "selected" : "")
+                    }
+                    style={recipientStyle(p.color)}
+                    aria-pressed={activePeople.includes(p.id)}
+                    onClick={() =>
+                      setPeople((old) =>
+                        old.includes(p.id)
+                          ? old.filter((id) => id !== p.id)
+                          : [...old, p.id],
+                      )
+                    }
+                  >
+                    {activePeople.includes(p.id) ? "✓ " : ""}
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <div className="guest-filter-bar">
               <label>
-                Budget maximum (€)
+                Budget max (€)
                 <input
                   type="number"
                   min="0"
                   value={max}
+                  placeholder="Sans limite"
                   onChange={(e) => setMax(e.target.value)}
                 />
               </label>
               <label>
                 Priorité
                 <select
+                  aria-label="Priorité"
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
                 >
-                  <option value="">Toutes les priorités</option>
+                  <option value="">Toutes</option>
                   <option value="0">♥ Coup de cœur</option>
                   <option value="1">★ Idée prioritaire</option>
                   <option value="2">Idée</option>
@@ -104,16 +133,32 @@ export default function Guest({
               <label>
                 Disponibilité
                 <select
+                  aria-label="Disponibilité"
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
                 >
-                  <option value="">Toutes les idées</option>
+                  <option value="">Toutes</option>
                   <option value="available">Disponibles</option>
                   <option value="reserved">Réservées</option>
                 </select>
               </label>
+              <label>
+                Trier par
+                <select
+                  aria-label="Trier par"
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as GuestSort)}
+                >
+                  <option value="priority">Priorité</option>
+                  <option value="price_asc">Prix croissant</option>
+                  <option value="price_desc">Prix décroissant</option>
+                  <option value="newest">Derniers ajouts</option>
+                </select>
+              </label>
             </div>
-            <p>{gifts.length} idées</p>
+            <p className="guest-result-count" role="status">
+              {gifts.length} {gifts.length === 1 ? "idée" : "idées"}
+            </p>
             {success && (
               <p role="status" className="notice">
                 Réservation enregistrée. Conservez ce lien pour la retrouver :{" "}
@@ -138,6 +183,14 @@ export default function Guest({
                           className={
                             "gift-card " + (reserved ? "reserved" : "")
                           }
+                          onClick={(e) => {
+                            if (
+                              !(e.target as HTMLElement).closest(
+                                "button,a,input,select,label",
+                              )
+                            )
+                              setDetailId(g.id);
+                          }}
                         >
                           <div className="gift-image">
                             {reserved && (
@@ -165,23 +218,35 @@ export default function Guest({
                             </span>
                           </div>
                           <div className="gift-body">
-                            <h2>{g.title}</h2>
+                            <h2>
+                              <button
+                                className="text-button card-open"
+                                onClick={() => setDetailId(g.id)}
+                              >
+                                {g.title}
+                              </button>
+                            </h2>
                             <p className="recipient">
-                              Pour qui ? <b>{g.recipient}</b>
+                              Pour qui ? <strong>{g.recipient}</strong>
                             </p>
                             <p>{formatPrice(g.priceMin, g.priceMax)}</p>
-                            <p>{g.description}</p>
+                            {g.description && (
+                              <p className="gift-excerpt">{g.description}</p>
+                            )}
                             {g.specifications && (
-                              <p className="specs">{g.specifications}</p>
+                              <p className="specs gift-excerpt">
+                                {g.specifications}
+                              </p>
                             )}
                             {g.imageCredit && (
                               <small>
+                                Photo :{" "}
                                 <a
+                                  href={g.imageCredit.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  href={g.imageCredit.url}
                                 >
-                                  Photo : {g.imageCredit.name} / Unsplash
+                                  {g.imageCredit.name} / Unsplash
                                 </a>
                               </small>
                             )}
@@ -210,10 +275,7 @@ export default function Guest({
                             ) : (
                               <button
                                 className="wide reservation-action"
-                                onClick={() => {
-                                  setGift(g);
-                                  setError("");
-                                }}
+                                onClick={() => setReserveId(g.id)}
                               >
                                 {g.collective
                                   ? "Participer"
@@ -230,94 +292,39 @@ export default function Guest({
             })}
           </>
         )}
-        {gift && (
-          <Modal title="Votre réservation" close={() => setGift(null)}>
-            <h2>{gift.title}</h2>
-            <p>
-              Pour <b>{gift.recipient}</b> ·{" "}
-              {formatPrice(gift.priceMin, gift.priceMax)}
-            </p>
-            <p>
-              {gift.specifications || "Aucune option particulière indiquée."}
-            </p>
-            {gift.url && (
-              <a href={gift.url} target="_blank" rel="noopener noreferrer">
-                Vérifier le produit ↗
-              </a>
+        {detailId && (
+          <Modal title="Détails du cadeau" close={() => setDetailId("")}>
+            {detail && !list.archived ? (
+              <GuestGiftDetails
+                gift={detail}
+                token={token}
+                reserve={() => {
+                  setDetailId("");
+                  setReserveId(detail.id);
+                }}
+              />
+            ) : (
+              <p>Cette idée n’est plus disponible dans la liste.</p>
             )}
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy(true);
-                const f = new FormData(e.currentTarget);
-                const r = await reserveGift({
-                  token,
-                  gift: gift.id,
-                  name: String(f.get("name")),
-                  email: String(f.get("email")),
-                  amount: gift.collective ? Number(f.get("amount")) : null,
-                });
-                setBusy(false);
-                if (r.ok && r.data) {
-                  setSuccess("/reservation/" + r.data.accessToken);
-                  setGift(null);
-                  router.refresh();
-                } else if (!r.ok) {
-                  setError(r.error);
-                  router.refresh();
-                }
-              }}
-            >
-              <label>
-                Votre nom, ou vos noms
-                <input
-                  required
-                  name="name"
-                  autoComplete="name"
-                  placeholder="Sophie et Marc"
-                  maxLength={100}
-                />
-              </label>
-              <label>
-                Votre email
-                <input
-                  required
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                />
-              </label>
-              {gift.collective && (
-                <label>
-                  Votre participation, sans paiement (€)
-                  <input
-                    name="amount"
-                    type="number"
-                    required
-                    min="0.01"
-                    step="0.01"
-                    max={Number(gift.targetAmount) - Number(gift.contributed)}
-                  />
-                  <small>
-                    Reste {Number(gift.targetAmount) - Number(gift.contributed)}{" "}
-                    €. Organisez-vous entre vous pour l’achat.
-                  </small>
-                </label>
-              )}
-              <p className="notice">
-                La réservation est immédiate. Votre nom reste masqué par défaut
-                pour les gestionnaires. L’email sert au récapitulatif et aux
-                changements concernant ce cadeau.
+          </Modal>
+        )}
+        {reserveId && (
+          <Modal title="Votre réservation" close={() => setReserveId("")}>
+            {reservation && !reservation.reserved && !list.archived ? (
+              <GuestReservation
+                gift={reservation}
+                token={token}
+                done={(access) => {
+                  setSuccess("/reservation/" + access);
+                  setReserveId("");
+                }}
+              />
+            ) : (
+              <p>
+                Cette idée n’est plus disponible à la réservation. Fermez cette
+                fenêtre pour poursuivre votre choix.
               </p>
-              {error && <p role="alert">{error}</p>}
-              <button disabled={busy} className="wide">
-                {busy
-                  ? "Enregistrement…"
-                  : gift.collective
-                    ? "Enregistrer ma participation"
-                    : "Réserver"}
-              </button>
-            </form>
+            )}
           </Modal>
         )}
       </main>

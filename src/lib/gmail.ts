@@ -65,14 +65,20 @@ export async function mailbox(profileId: string) {
 export type InlineImage = { content: Uint8Array; contentType: string };
 export function gmailMessage(
   from: string,
-  to: string,
+  to: string | string[],
   subject: string,
   html: string,
   image?: InlineImage,
+  replyTo?: string,
 ) {
+  const recipients = typeof to === "string" ? [to] : to;
+  const address = (s: string) => /^[^\s,@<>]+@[^\s,@<>]+$/.test(s);
   if (
-    !/^[^\r\n<>]+@[^\r\n<>]+$/.test(to) ||
-    !/^[^\r\n<>]+@[^\r\n<>]+$/.test(from)
+    !recipients.length ||
+    recipients.length > 10 ||
+    !recipients.every(address) ||
+    !address(from) ||
+    (replyTo !== undefined && !address(replyTo))
   )
     throw Error("Adresse email incorrecte");
   const encode = (value: string | Uint8Array) =>
@@ -82,7 +88,8 @@ export function gmailMessage(
       ?.join("\r\n") || "";
   const headers = [
     "From: " + from,
-    "To: " + to,
+    "To: " + recipients.join(", "),
+    ...(replyTo ? ["Reply-To: " + replyTo] : []),
     "Subject: =?UTF-8?B?" + Buffer.from(subject).toString("base64") + "?=",
     "MIME-Version: 1.0",
   ];
@@ -125,10 +132,11 @@ export function gmailMessage(
 
 export async function sendGmail(
   profileId: string,
-  to: string,
+  to: string | string[],
   subject: string,
   html: string,
   image?: InlineImage,
+  replyTo?: string,
 ) {
   const db = serviceClient();
   const { data } = await db
@@ -151,7 +159,7 @@ export async function sendGmail(
   const token = await tokenResponse.json();
   if (!tokenResponse.ok || !token.access_token)
     throw Error("La connexion Gmail doit être renouvelée.");
-  const mime = gmailMessage(data.email, to, subject, html, image);
+  const mime = gmailMessage(data.email, to, subject, html, image, replyTo);
   const result = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
     {

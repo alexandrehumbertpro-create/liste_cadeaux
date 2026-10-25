@@ -202,6 +202,15 @@ await sql.query(
     "utf8",
   ),
 );
+await sql.query(
+  await readFile(
+    new URL(
+      "../supabase/migrations/202610250002_guest_experience.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 
 await sql.end();
 await writeFile(

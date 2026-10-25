@@ -82,6 +82,8 @@ export type Dataset = {
   }[];
 };
 export type SharedGift = {
+  recipientColor?: string;
+  createdAt?: string;
   id: string;
   title: string;
   description: string;

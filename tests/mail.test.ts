@@ -15,6 +15,7 @@ let profile: { id: string; email: string } | null;
 let claims: Record<string, any[]>;
 let updates: { id: string; patch: any }[];
 let rpc: ReturnType<typeof vi.fn>;
+let questionList: any;
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("APP_URL", "https://gifts.example.test");
@@ -22,16 +23,28 @@ beforeEach(() => {
   profile = { id: alex, email: "alex@example.test" };
   claims = { gmail: [], resend: [] };
   updates = [];
+  questionList = {
+    name: "Noël",
+    archived: false,
+    gifts: [{ id: "gift", title: "Lampe", recipient: "Elise" }],
+  };
   vi.mocked(gmailConfigured).mockReturnValue(true);
   vi.mocked(sendGmail).mockResolvedValue(undefined);
-  rpc = vi.fn(async (_name: string, { provider }: { provider: string }) => ({
-    data: claims[provider],
+  rpc = vi.fn(async (name: string, args: any) => ({
+    data: name === "shared_list" ? questionList : claims[args.provider],
   }));
   vi.mocked(serviceClient).mockReturnValue({
     rpc,
     from(table: string) {
       const query: any = {
         select: () => query,
+        in: () =>
+          Promise.resolve({
+            data: [
+              { id: alex, email: "alex@example.test" },
+              { id: "elise-profile", email: "elise@example.test" },
+            ],
+          }),
         single: async () => ({
           data: {
             id: "idea",
@@ -182,4 +195,47 @@ describe("Notifications automatiques par Gmail", () => {
     expect(rpc).not.toHaveBeenCalled();
     expect(sendGmail).not.toHaveBeenCalled();
   });
+});
+
+it("transmet la question aux deux administrateurs dans un seul email avec Reply-To invité", async () => {
+  claims.resend = [
+    {
+      id: "question",
+      kind: "gift_question",
+      email: "alex@example.test",
+      payload: {
+        listToken: "list-token",
+        giftId: "gift",
+        recipientProfileIds: [alex, "elise-profile"],
+        guestName: "Sophie",
+        guestEmail: "sophie@example.test",
+        question: "Quelle couleur ? <script>",
+      },
+    },
+  ];
+  const result = await drainEmails();
+  expect(result.sent).toBe(1);
+  expect(sendGmail).toHaveBeenCalledTimes(1);
+  expect(sendGmail).toHaveBeenCalledWith(
+    alex,
+    ["alex@example.test", "elise@example.test"],
+    "Question sur un cadeau : Lampe",
+    expect.stringContaining("&lt;script&gt;"),
+    undefined,
+    "sophie@example.test",
+  );
+  expect(updates[0].patch.status).toBe("sent");
+});
+it("annule la question en attente si le cadeau n’est plus public", async () => {
+  questionList = { name: "Noël", archived: false, gifts: [] };
+  claims.resend = [
+    {
+      id: "question",
+      kind: "gift_question",
+      payload: { listToken: "token", giftId: "gift" },
+    },
+  ];
+  await drainEmails();
+  expect(sendGmail).not.toHaveBeenCalled();
+  expect(updates[0].patch.status).toBe("cancelled");
 });

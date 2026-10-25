@@ -84,6 +84,13 @@ export const adminReservationInput = reservationInput
     listId: z.uuid(),
     email: z.union([z.email().max(254), z.literal("")]).optional(),
   });
+export const giftQuestionInput = z.object({
+  token: z.uuid(),
+  gift: z.uuid(),
+  name: z.string().trim().min(1).max(100),
+  email: z.email().max(254),
+  question: z.string().trim().min(1).max(2000),
+});
 export type GiftInput = z.infer<typeof giftInput>;
 export function formatPrice(min: number | null, max: number | null) {
   if (min === null) return "Prix non renseigné";

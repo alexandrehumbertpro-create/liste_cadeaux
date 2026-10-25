@@ -242,6 +242,15 @@ try {
       "utf8",
     ),
   );
+  await db.query(
+    await readFile(
+      new URL(
+        "../supabase/migrations/202610250002_guest_experience.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 
   await check(
     "La migration conserve les anciens changements et partages avec leur date et leur auteur",
@@ -1551,6 +1560,116 @@ try {
         ).rows[0].n,
         1,
       );
+    },
+  );
+
+  await check(
+    "La liste invitée expose seulement la couleur et la date utiles aux nouveaux filtres",
+    async () => {
+      const pid = await make();
+      const shared = (
+        await db.query("select shared_list($1) data", [list.share_token])
+      ).rows[0].data;
+      const gift = shared.gifts.find((g) => g.id === pid);
+      assert.equal(
+        gift.recipientColor,
+        (
+          await db.query("select color from recipients where id=$1", [
+            recipient,
+          ])
+        ).rows[0].color,
+      );
+      assert.ok(gift.createdAt);
+      assert.ok(!("private_note" in gift));
+      assert.ok(!("email" in gift));
+    },
+  );
+  await check(
+    "Une question crée un seul email destiné simultanément à Alex et Elise",
+    async () => {
+      const pid = await make();
+      const id = (
+        await db.query(
+          "select submit_gift_question($1,$2,'Sophie','sophie@example.test','Quelle couleur choisir ?') id",
+          [list.share_token, pid],
+        )
+      ).rows[0].id;
+      const job = (await db.query("select * from email_jobs where id=$1", [id]))
+        .rows[0];
+      assert.equal(job.kind, "gift_question");
+      assert.deepEqual(
+        job.payload.recipientProfileIds.slice().sort(),
+        [alex, elise].sort(),
+      );
+      assert.equal(job.payload.guestEmail, "sophie@example.test");
+      assert.equal(job.payload.question, "Quelle couleur choisir ?");
+      assert.equal(job.payload.giftId, pid);
+      assert.equal(job.payload.listId, list.id);
+      await assert.rejects(
+        admin(
+          alex,
+          "select submit_gift_question($1,$2,'Intrus','intrus@example.test','Question')",
+          [list.share_token, pid],
+        ),
+        /permission denied/,
+      );
+    },
+  );
+  await check(
+    "Une question ne peut pas viser une idée privée, hors liste ou une liste archivée",
+    async () => {
+      const hidden = await make("private");
+      await assert.rejects(
+        db.query(
+          "select submit_gift_question($1,$2,'Sophie','sophie@example.test','Question')",
+          [list.share_token, hidden],
+        ),
+        /gift_unavailable/,
+      );
+      const pid = await make();
+      const other = (
+        await admin(
+          alex,
+          "insert into lists(name,created_by,archived_at) values('Question fermée',$1,now()) returning share_token",
+          [alex],
+        )
+      ).rows[0].share_token;
+      await assert.rejects(
+        db.query(
+          "select submit_gift_question($1,$2,'Sophie','sophie@example.test','Question')",
+          [other, pid],
+        ),
+        /gift_unavailable/,
+      );
+      await assert.rejects(
+        db.query(
+          "select submit_gift_question($1,$2,'Sophie','sophie@example.test','Question')",
+          [randomUUID(), pid],
+        ),
+        /gift_unavailable/,
+      );
+    },
+  );
+  await check(
+    "Nom, email et message sont requis et la question reste limitée à 2 000 caractères",
+    async () => {
+      const pid = await make();
+      for (const args of [
+        [null, "sophie@example.test", "Question"],
+        ["Sophie", null, "Question"],
+        ["Sophie", "invalide", "Question"],
+        ["Sophie", "sophie@example.test", " "],
+        ["Sophie", "sophie@example.test", "x".repeat(2001)],
+      ]) {
+        await assert.rejects(
+          db.query("select submit_gift_question($1,$2,$3,$4,$5)", [
+            list.share_token,
+            pid,
+            ...args,
+          ]),
+          /invalid_question/,
+        );
+      }
     },
   );
   console.log(`${checks} vérifications PostgreSQL réussies.`);

@@ -55,6 +55,65 @@ export async function drainEmails() {
   }
   let sent = 0;
   for (const job of jobs ?? []) {
+    if (job.kind === "gift_question") {
+      try {
+        const { data: shared, error: sharedError } = await db.rpc(
+          "shared_list",
+          { token: job.payload.listToken },
+        );
+        if (sharedError) throw Error("Liste temporairement indisponible");
+        const gift = shared?.gifts?.find(
+          (g: any) => g.id === job.payload.giftId,
+        );
+        if (!shared || shared.archived || !gift) {
+          await db
+            .from("email_jobs")
+            .update({
+              status: "cancelled",
+              last_error: "Envoi annulé : l’idée n’est plus partagée.",
+            })
+            .eq("id", job.id);
+          continue;
+        }
+        const { data: profiles } = await db
+          .from("profiles")
+          .select("id,email")
+          .in("id", job.payload.recipientProfileIds);
+        if (!automaticSender || profiles?.length !== 2)
+          throw Error("Destinataires indisponibles");
+        const link =
+          process.env.APP_URL +
+          "/l/" +
+          encodeURIComponent(job.payload.listToken);
+        const html = brandedEmail(
+          `<h2>Une question sur ${escape(gift.title)}</h2><p>Liste : ${escape(shared.name)} · Pour : ${escape(gift.recipient)}</p><p>De : ${escape(job.payload.guestName)} (${escape(job.payload.guestEmail)})</p><div style="white-space:pre-wrap">${escape(job.payload.question)}</div><p><a href="${escape(link)}">Ouvrir la liste</a></p><p>Répondez directement à cet email pour répondre à l’invité.</p>`,
+        );
+        await sendGmail(
+          automaticSender,
+          profiles.map((p: any) => p.email),
+          "Question sur un cadeau : " + gift.title,
+          html,
+          undefined,
+          job.payload.guestEmail,
+        );
+        await db
+          .from("email_jobs")
+          .update({ status: "sent", last_error: null })
+          .eq("id", job.id);
+        sent++;
+      } catch {
+        await db
+          .from("email_jobs")
+          .update({
+            status: "pending",
+            last_error:
+              "Question en attente d’envoi. Vérifiez le Gmail d’Alex.",
+          })
+          .eq("id", job.id);
+      }
+      continue;
+    }
+
     if (["idea_added", "quick_share"].includes(job.kind)) {
       try {
         const { data: idea } = await db
