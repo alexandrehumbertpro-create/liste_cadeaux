@@ -36,6 +36,18 @@ export const login = safe(server.login),
 export const logout = server.logout;
 export type Result<T = unknown> = server.Result<T>;
 
+export async function saveVoiceGift(input: unknown) {
+  try {
+    return await server.saveVoiceGift(input);
+  } catch {
+    return {
+      ok: false as const,
+      uncertain: true,
+      error: "La connexion a été interrompue.",
+    };
+  }
+}
+
 export const renameRecipient = safe(server.renameRecipient),
   removeRecipient = safe(server.removeRecipient),
   shareIdeaEmail = safe(server.shareIdeaEmail),

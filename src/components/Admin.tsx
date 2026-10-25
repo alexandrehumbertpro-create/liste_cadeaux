@@ -12,6 +12,8 @@ import { budgetOverlap, formatPrice, inList } from "@/lib/validation";
 import * as actions from "@/lib/client-actions";
 import Modal from "./Modal";
 import GiftForm from "./GiftForm";
+import VoiceIdea from "./VoiceIdea";
+import { Mic } from "lucide-react";
 import ImageInput from "./ImageInput";
 import QuickShare from "./QuickShare";
 import ColorPicker from "./ColorPicker";
@@ -35,6 +37,7 @@ export default function Admin({
   const router = useRouter();
   const urlParams = useSearchParams().toString();
   const [view, setView] = useState("people"),
+    [voiceOpen, setVoiceOpen] = useState(false),
     [listId, setList] = useState(""),
     [person, setPerson] = useState(""),
     [query, setQuery] = useState(""),
@@ -1351,9 +1354,30 @@ export default function Admin({
           )}
         </main>
       </div>
-      <button className="add-sticky" onClick={add}>
-        + Idée
-      </button>
+      <div className="capture-sticky">
+        <button
+          className="voice-trigger secondary"
+          aria-label="Dicter une idée"
+          title="Dicter une idée"
+          onClick={() => setVoiceOpen(true)}
+        >
+          <Mic size={22} aria-hidden="true" />
+        </button>
+        <button className="add-sticky" onClick={add}>
+          + Idée
+        </button>
+      </div>
+      {voiceOpen && (
+        <VoiceIdea
+          recipients={personalOrder(data.recipients, { ...prefs, order })}
+          defaultRecipientId={person || undefined}
+          defaultList={data.lists.find(
+            (l) => l.id === listId && !l.archived_at,
+          )}
+          close={() => setVoiceOpen(false)}
+          saved={setNotice}
+        />
+      )}
       {form && (
         <Modal
           message={notice}

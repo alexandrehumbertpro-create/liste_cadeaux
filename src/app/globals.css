@@ -212,6 +212,62 @@ nav small {
   padding: 14px 25px;
   z-index: 3;
 }
+.capture-sticky {
+  position: fixed;
+  right: 32px;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 3;
+}
+.capture-sticky .add-sticky {
+  position: static;
+}
+.voice-trigger {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 16px #17213b18;
+}
+.voice-hint {
+  font-size: 13px;
+}
+.voice-idea > p[role="status"],
+.voice-idea button {
+  align-items: center;
+  gap: 8px;
+}
+.voice-idea > p[role="status"],
+.voice-idea .row {
+  display: flex;
+  flex-wrap: wrap;
+}
+.voice-transcript {
+  min-height: 60px;
+  overflow-wrap: anywhere;
+}
+.voice-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.voice-people [aria-pressed="true"] {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+.voice-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.voice-idea form {
+  display: grid;
+  gap: 12px;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -691,6 +747,10 @@ dialog > header h2 {
   .add-sticky {
     right: 20px;
     bottom: 20px;
+  }
+  .capture-sticky {
+    right: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom));
   }
   .guest {
     padding: 20px 16px;

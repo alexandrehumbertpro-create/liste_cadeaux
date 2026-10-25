@@ -111,6 +111,77 @@ export async function saveGift(input: unknown): Promise<Result<string>> {
     };
   }
 }
+// Voice capture creates only a new idea. No edit, reservation or email action.
+export async function saveVoiceGift(
+  input: unknown,
+): Promise<Result<string> & { uncertain?: boolean }> {
+  try {
+    const { db } = await requireAdmin();
+    const data = giftInput.parse(input);
+    if (data.ideaId || data.proposalId || data.notifyIds)
+      return {
+        ok: false,
+        error: "La dictée permet uniquement d’ajouter une nouvelle idée.",
+      };
+    if (data.candidates.length) {
+      const { data: people, error } = await db
+        .from("recipients")
+        .select("id")
+        .in("id", data.candidates)
+        .is("deleted_at", null);
+      if (error)
+        return {
+          ok: false,
+          error: "Impossible de vérifier les personnes. Réessayez.",
+        };
+      if (data.candidates.some((id) => !people?.some((p) => p.id === id)))
+        return {
+          ok: false,
+          error: "Une personne n’est plus disponible. Vérifiez le pour qui.",
+        };
+    }
+    if (data.listIds.length) {
+      const { data: lists, error } = await db
+        .from("lists")
+        .select("id")
+        .in("id", data.listIds)
+        .is("archived_at", null);
+      if (error)
+        return {
+          ok: false,
+          error: "Impossible de vérifier la liste. Réessayez.",
+        };
+      if (data.listIds.some((id) => !lists?.some((l) => l.id === id)))
+        return {
+          ok: false,
+          error:
+            "Cette liste a été archivée. Fermez la dictée et ajoutez l’idée depuis Mes idées.",
+        };
+    }
+    const { data: id, error } = await db.rpc("save_gift_for_recipients", {
+      data,
+    });
+    if (error)
+      return {
+        ok: false,
+        error: message(new Error(error.message)),
+        // A network failure can occur after commit. Never encourage a blind retry.
+        uncertain: !error.code || error.code.startsWith("PGRST0"),
+      };
+    revalidatePath("/");
+    return { ok: true, data: id };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof z.ZodError ? e.issues[0].message : message(e),
+      uncertain:
+        !(e instanceof z.ZodError) &&
+        !(
+          e instanceof Error && /Connectez-vous|administration/.test(e.message)
+        ),
+    };
+  }
+}
 export async function createRecipient(
   name: string,
   color = "#e9eeff",

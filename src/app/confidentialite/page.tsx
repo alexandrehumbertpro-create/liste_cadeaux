@@ -38,6 +38,14 @@ export default function PrivacyPage() {
         est conservée dans la file de messages pour permettre son envoi et les
         éventuels réessais.
       </p>
+      <h2>La dictée d’idées</h2>
+      <p>
+        La dictée utilise le microphone avec votre autorisation et le service de
+        reconnaissance vocale de votre navigateur, qui peut transmettre l’audio
+        à son prestataire pour le transcrire. La Hotte Humbert ne conserve pas
+        l’enregistrement audio. Seuls les champs de l’idée ajoutée sont
+        enregistrés dans le carnet. Fermer la dictée arrête l’écoute.
+      </p>
       <h2>La connexion Google et Gmail</h2>
       <p>
         La connexion facultative des administrateurs à Google permet
