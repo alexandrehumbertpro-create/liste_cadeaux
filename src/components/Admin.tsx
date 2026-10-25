@@ -2,6 +2,7 @@
 import ActivityLog from "./ActivityLog";
 import ListShares from "./ListShares";
 import { listHistory } from "@/lib/list-history";
+import AdminReservation from "./AdminReservation";
 import Brand from "@/components/Brand";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -65,6 +66,7 @@ export default function Admin({
     [personName, setPersonName] = useState(""),
     [archivePersonIdeas, setArchivePersonIdeas] = useState(false),
     [shareProposal, setShareProposal] = useState<Proposal | null>(null),
+    [reserveProposal, setReserveProposal] = useState<Proposal | null>(null),
     [colorPerson, setColorPerson] = useState(""),
     [personColor, setPersonColor] = useState("#e9eeff");
   const draftKey = "kad-draft-" + data.profile.id;
@@ -1170,6 +1172,21 @@ export default function Admin({
                                 </a>
                               )}
                               <div className="row">
+                                {currentList &&
+                                  !currentList.archived_at &&
+                                  !p.archived_at &&
+                                  !p.reserved &&
+                                  data.recipients.some(
+                                    (r) =>
+                                      r.id === p.recipient_id && !r.deleted_at,
+                                  ) && (
+                                    <button
+                                      className="secondary"
+                                      onClick={() => setReserveProposal(p)}
+                                    >
+                                      Réserver pour quelqu’un
+                                    </button>
+                                  )}
                                 <button
                                   className="secondary"
                                   onClick={() => setShareProposal(p)}
@@ -1424,6 +1441,40 @@ export default function Admin({
           >
             Écarter et créer une idée
           </button>
+        </Modal>
+      )}
+      {reserveProposal && currentList && (
+        <Modal
+          title="Réserver pour quelqu’un"
+          close={() => setReserveProposal(null)}
+        >
+          {data.ideas.find((i) => i.id === reserveProposal.idea_id) &&
+          data.proposals.find(
+            (p) => p.id === reserveProposal.id && !p.reserved && !p.archived_at,
+          ) ? (
+            <AdminReservation
+              idea={data.ideas.find((i) => i.id === reserveProposal.idea_id)!}
+              proposal={data.proposals.find(
+                (p) => p.id === reserveProposal.id,
+              )!}
+              listId={currentList.id}
+              recipient={
+                data.recipients.find(
+                  (r) => r.id === reserveProposal.recipient_id,
+                )?.name || "Non renseigné"
+              }
+              done={(notice) => {
+                setReserveProposal(null);
+                setNotice(notice);
+                refresh();
+              }}
+            />
+          ) : (
+            <p>
+              Cette idée n’est plus disponible. Fermez cette fenêtre pour
+              actualiser votre choix.
+            </p>
+          )}
         </Modal>
       )}
       {shareProposal && (

@@ -9,7 +9,12 @@ import {
   serverClient,
   serviceClient,
 } from "@/lib/supabase/server";
-import { giftInput, reservationInput, imageReference } from "@/lib/validation";
+import {
+  giftInput,
+  reservationInput,
+  adminReservationInput,
+  imageReference,
+} from "@/lib/validation";
 import { drainEmails, transactionalSenderId } from "@/lib/mail";
 import { gmailConfigured, mailbox } from "@/lib/gmail";
 import { signImage } from "@/lib/images";
@@ -26,6 +31,8 @@ function message(error: unknown) {
     private_notification_forbidden:
       "Une idée privée ne peut pas être envoyée à l’autre administrateur.",
     recipient_not_found: "Personne introuvable.",
+    invalid_guest:
+      "Indiquez un nom et une adresse email valide si vous en renseignez une.",
     invalid_color: "Choisissez une couleur valide.",
     invalid_name: "Indiquez un nom valide.",
     gift_unavailable:
@@ -370,6 +377,33 @@ export async function reserveGift(
       error:
         e instanceof z.ZodError
           ? "Vérifiez votre nom, email et montant."
+          : message(e),
+    };
+  }
+}
+export async function reserveForGuest(
+  input: unknown,
+): Promise<Result<{ emailQueued: boolean }>> {
+  try {
+    const { db } = await requireAdmin();
+    const v = adminReservationInput.parse(input);
+    const { data, error } = await db.rpc("admin_reserve_gift", {
+      list_ref: v.listId,
+      gift: v.gift,
+      guest_name: v.name,
+      guest_email: v.email || null,
+      contribution: v.amount,
+    });
+    if (error) throw Error(error.message);
+    revalidatePath("/");
+    await drainEmails().catch(() => undefined);
+    return { ok: true, data: { emailQueued: Boolean(data?.emailQueued) } };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof z.ZodError
+          ? "Vérifiez le nom, l’email et le montant."
           : message(e),
     };
   }

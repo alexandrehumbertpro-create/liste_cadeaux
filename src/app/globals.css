@@ -1179,3 +1179,13 @@ button,
 .share-history span {
   font-size: 14px;
 }
+
+.reservation-recap {
+  padding: 16px;
+  border-radius: 16px;
+  background: #eef2ff;
+  margin-bottom: 20px;
+}
+.reservation-recap h3 {
+  margin-top: 0;
+}

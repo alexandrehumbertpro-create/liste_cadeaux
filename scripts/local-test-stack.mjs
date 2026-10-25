@@ -193,6 +193,15 @@ await sql.query(
     "utf8",
   ),
 );
+await sql.query(
+  await readFile(
+    new URL(
+      "../supabase/migrations/202610250001_admin_reservations.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 
 await sql.end();
 await writeFile(

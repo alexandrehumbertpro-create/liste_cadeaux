@@ -233,6 +233,16 @@ try {
       "utf8",
     ),
   );
+  await db.query(
+    await readFile(
+      new URL(
+        "../supabase/migrations/202610250001_admin_reservations.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+
   await check(
     "La migration conserve les anciens changements et partages avec leur date et leur auteur",
     async () => {
@@ -1217,6 +1227,330 @@ try {
       ).rows[0];
       assert.equal(latest.message, "Paramètres de l’idée modifiés");
       assert.deepEqual(latest.list_ids, []);
+    },
+  );
+
+  await check(
+    "Un administrateur réserve sans email : nom obligatoire, auteur conservé et aucun faux email",
+    async () => {
+      const pid = await make();
+      await assert.rejects(
+        admin(alex, "select admin_reserve_gift($1,$2,'   ',null,null)", [
+          list.id,
+          pid,
+        ]),
+        /invalid_guest/,
+      );
+      const reply = (
+        await admin(
+          alex,
+          "select admin_reserve_gift($1,$2,'Sophie et Marc',null,null) data",
+          [list.id, pid],
+        )
+      ).rows[0].data;
+      assert.equal(reply.emailQueued, false);
+      const reservation = (
+        await db.query("select * from reservations where proposal_id=$1", [pid])
+      ).rows[0];
+      assert.equal(reservation.name, "Sophie et Marc");
+      assert.equal(reservation.email, null);
+      assert.equal(reservation.reserved_by, alex);
+      assert.equal(
+        (await db.query("select reserved from proposals where id=$1", [pid]))
+          .rows[0].reserved,
+        true,
+      );
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from email_jobs where payload->>'accessToken'=$1",
+            [reservation.access_token],
+          )
+        ).rows[0].n,
+        0,
+      );
+      const iid = (
+        await db.query("select idea_id from proposals where id=$1", [pid])
+      ).rows[0].idea_id;
+      const event = (
+        await admin(
+          elise,
+          "select * from activity where idea_id=$1 and message='Idée réservée' order by id desc",
+          [iid],
+        )
+      ).rows[0];
+      assert.equal(event.actor_id, alex);
+      assert.ok(!JSON.stringify(event).includes("Sophie et Marc"));
+      assert.equal(
+        (await admin(elise, "select reveal_gift($1) data", [pid])).rows[0]
+          .data[0].name,
+        "Sophie et Marc",
+      );
+    },
+  );
+  await check(
+    "Un email facultatif valide reçoit le récapitulatif et la notification de déréservation",
+    async () => {
+      const pid = await make();
+      const response = (
+        await admin(
+          elise,
+          "select admin_reserve_gift($1,$2,'Sophie',' SOPHIE@example.test ',null) data",
+          [list.id, pid],
+        )
+      ).rows[0].data;
+      assert.equal(response.emailQueued, true);
+      const r = (
+        await db.query("select * from reservations where proposal_id=$1", [pid])
+      ).rows[0];
+      assert.equal(r.email, "sophie@example.test");
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from email_jobs where kind='reserved' and payload->>'accessToken'=$1",
+            [r.access_token],
+          )
+        ).rows[0].n,
+        1,
+      );
+      await admin(alex, "select reset_gift($1,false)", [pid]);
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from email_jobs where kind='changed' and payload->>'accessToken'=$1",
+            [r.access_token],
+          )
+        ).rows[0].n,
+        1,
+      );
+    },
+  );
+  await check(
+    "Les invités ne peuvent pas réserver sans email, ni appeler la fonction administrateur",
+    async () => {
+      const pid = await make();
+      await assert.rejects(
+        db.query("select reserve_gift($1,$2,'Invité',null,null)", [
+          list.share_token,
+          pid,
+        ]),
+        /invalid_guest/,
+      );
+      await assert.rejects(
+        db.query("select reserve_gift($1,$2,'Invité','',null)", [
+          list.share_token,
+          pid,
+        ]),
+        /invalid_guest/,
+      );
+      await assert.rejects(
+        admin(outsider, "select admin_reserve_gift($1,$2,'Intrus',null,null)", [
+          list.id,
+          pid,
+        ]),
+        /not_authorized/,
+      );
+      await db.query("begin");
+      try {
+        await db.query("set local role anon");
+        await assert.rejects(
+          db.query("select admin_reserve_gift($1,$2,'Intrus',null,null)", [
+            list.id,
+            pid,
+          ]),
+          /permission denied/,
+        );
+      } finally {
+        await db.query("rollback");
+      }
+      await assert.rejects(
+        db.query(
+          "insert into reservations(proposal_id,name) values($1,'Sans auteur')",
+          [pid],
+        ),
+        /email_optional_only_for_admin/,
+      );
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from reservations where proposal_id=$1",
+            [pid],
+          )
+        ).rows[0].n,
+        0,
+      );
+    },
+  );
+  await check(
+    "Les réservations admin respectent la confidentialité et ne notifient pas une idée privée à l’autre compte",
+    async () => {
+      const pid = await make("private");
+      const iid = (
+        await db.query("select idea_id from proposals where id=$1", [pid])
+      ).rows[0].idea_id;
+      await admin(
+        alex,
+        "update ideas set title='PRIVE_ADMIN_TEST' where id=$1",
+        [iid],
+      );
+      await assert.rejects(
+        admin(elise, "select admin_reserve_gift($1,$2,'Autre',null,null)", [
+          list.id,
+          pid,
+        ]),
+        /gift_unavailable/,
+      );
+      await admin(
+        alex,
+        "select admin_reserve_gift($1,$2,'Personne',null,null)",
+        [list.id, pid],
+      );
+      const jobs = (
+        await db.query(
+          "select email from email_jobs where kind='admin_reserved' and payload->>'title'='PRIVE_ADMIN_TEST'",
+        )
+      ).rows;
+      assert.deepEqual(
+        jobs.map((j) => j.email),
+        ["alex@example.test"],
+      );
+    },
+  );
+  await check(
+    "Une réservation sans email supporte une modification du cadeau et une déréservation",
+    async () => {
+      const pid = await make();
+      await admin(
+        alex,
+        "select admin_reserve_gift($1,$2,'Sans email','',null)",
+        [list.id, pid],
+      );
+      const r = (
+        await db.query("select * from reservations where proposal_id=$1", [pid])
+      ).rows[0];
+      await admin(
+        alex,
+        "update ideas set specifications='Nouvelle taille' where id=(select idea_id from proposals where id=$1)",
+        [pid],
+      );
+      await admin(elise, "select reset_gift($1,false)", [pid]);
+      assert.ok(
+        (
+          await db.query("select cancelled_at from reservations where id=$1", [
+            r.id,
+          ])
+        ).rows[0].cancelled_at,
+      );
+      assert.equal(
+        (await db.query("select reserved from proposals where id=$1", [pid]))
+          .rows[0].reserved,
+        false,
+      );
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from email_jobs where payload->>'accessToken'=$1",
+            [r.access_token],
+          )
+        ).rows[0].n,
+        0,
+      );
+    },
+  );
+  await check(
+    "Les participations admin s’arrêtent au budget et une liste étrangère ou archivée est refusée",
+    async () => {
+      const pid = await make("public", true);
+      await assert.rejects(
+        admin(alex, "select admin_reserve_gift($1,$2,'Montant',null,100.001)", [
+          list.id,
+          pid,
+        ]),
+        /invalid_contribution/,
+      );
+      await admin(
+        alex,
+        "select admin_reserve_gift($1,$2,'Participant',null,60)",
+        [list.id, pid],
+      );
+      await assert.rejects(
+        admin(elise, "select admin_reserve_gift($1,$2,'Trop',null,60)", [
+          list.id,
+          pid,
+        ]),
+        /invalid_contribution/,
+      );
+      await admin(
+        elise,
+        "select admin_reserve_gift($1,$2,'Complément',null,40)",
+        [list.id, pid],
+      );
+      assert.equal(
+        (await db.query("select reserved from proposals where id=$1", [pid]))
+          .rows[0].reserved,
+        true,
+      );
+      const other = (
+        await admin(
+          alex,
+          "insert into lists(name,created_by) values('Refus réservation',$1) returning id",
+          [alex],
+        )
+      ).rows[0].id;
+      const free = await make();
+      await assert.rejects(
+        admin(alex, "select admin_reserve_gift($1,$2,'Hors liste',null,null)", [
+          other,
+          free,
+        ]),
+        /gift_unavailable/,
+      );
+      await admin(alex, "update lists set archived_at=now() where id=$1", [
+        other,
+      ]);
+      await assert.rejects(
+        admin(
+          alex,
+          "select admin_reserve_gift($1,$2,'Liste archivée',null,null)",
+          [other, free],
+        ),
+        /gift_unavailable/,
+      );
+    },
+  );
+  await check(
+    "Une réservation invitée et une réservation admin simultanées ne créent pas de doublon",
+    async () => {
+      const pid = await make();
+      const adminCall = async () => {
+        const c = new pg.Client({ connectionString: url.toString() });
+        await c.connect();
+        try {
+          await c.query("begin");
+          await c.query("set local role authenticated");
+          await c.query("select set_config('request.jwt.claim.sub',$1,true)", [
+            alex,
+          ]);
+          await c.query(
+            "select admin_reserve_gift($1,$2,'Admin concurrent',null,null)",
+            [list.id, pid],
+          );
+          await c.query("commit");
+        } finally {
+          await c.end();
+        }
+      };
+      const results = await Promise.allSettled([reserve(pid), adminCall()]);
+      assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+      assert.equal(
+        (
+          await db.query(
+            "select count(*)::int n from reservations where proposal_id=$1 and cancelled_at is null",
+            [pid],
+          )
+        ).rows[0].n,
+        1,
+      );
     },
   );
   console.log(`${checks} vérifications PostgreSQL réussies.`);
